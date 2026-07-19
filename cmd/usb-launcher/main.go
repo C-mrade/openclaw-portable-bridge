@@ -72,18 +72,20 @@ func run() error {
 	args := []string{"-broker", cfg.BrokerURL, "-usb-id", cfg.USBID, "-profile", profile}
 	if strings.TrimSpace(choice) == "2" {
 		profile = "developer"
-		fmt.Println("Profilo Sviluppatore: shell utente, processi e file nelle sole cartelle selezionate.")
-		fmt.Print("Percorso assoluto della cartella consentita: ")
-		root, _ := reader.ReadString('\n')
-		root = strings.TrimSpace(root)
-		if root == "" {
-			return errors.New("il profilo Sviluppatore richiede una cartella esplicitamente selezionata")
+		fmt.Println("ATTENZIONE: Sviluppatore abilita terminale e file su tutte le unità accessibili.")
+		fmt.Println("I comandi amministrativi genereranno ogni volta un normale prompt UAC locale.")
+		fmt.Print("Digita SVILUPPATORE per confermare: ")
+		confirmation, _ := reader.ReadString('\n')
+		if strings.TrimSpace(confirmation) != "SVILUPPATORE" {
+			return errors.New("profilo Sviluppatore non confermato")
 		}
-		info, e := os.Stat(root)
-		if e != nil || !info.IsDir() {
-			return errors.New("cartella consentita non valida")
+		args = []string{"-broker", cfg.BrokerURL, "-usb-id", cfg.USBID, "-profile", profile}
+		for letter := 'A'; letter <= 'Z'; letter++ {
+			volume := fmt.Sprintf("%c:\\", letter)
+			if info, statErr := os.Stat(volume); statErr == nil && info.IsDir() {
+				args = append(args, "-allow-dir", volume)
+			}
 		}
-		args = []string{"-broker", cfg.BrokerURL, "-usb-id", cfg.USBID, "-profile", profile, "-allow-dir", root}
 	} else {
 		fmt.Println("Profilo Informazioni: inventario di sistema/rete/dischi/servizi e lettura file opzionale.")
 		fmt.Print("Cartella consultabile (INVIO per nessun accesso file): ")

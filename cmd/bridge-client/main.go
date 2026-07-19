@@ -29,7 +29,7 @@ func capabilities(p string) []string {
 	case "information":
 		return []string{"system.info", "system.network", "disk.list", "service.list", "process.list", "files.list", "files.read", "files.download", "session.disconnect"}
 	case "developer":
-		return []string{"system.info", "system.network", "disk.list", "service.list", "process.list", "process.start", "process.stop-owned", "shell.run", "files.list", "files.read", "files.write", "files.upload", "files.download", "session.disconnect"}
+		return []string{"system.info", "system.network", "disk.list", "service.list", "process.list", "process.start", "process.stop-owned", "shell.run", "shell.run-admin", "files.list", "files.read", "files.write", "files.upload", "files.download", "session.disconnect"}
 	case "custom":
 		return []string{"system.info", "session.disconnect"}
 	}
@@ -132,6 +132,14 @@ func main() {
 			continue
 		}
 		start := time.Now()
+		if cmd.Name == "shell.run" || cmd.Name == "shell.run-admin" {
+			var shown struct {
+				Command string `json:"command"`
+			}
+			if json.Unmarshal(cmd.Params, &shown) == nil {
+				fmt.Printf("[%s] COMANDO RICEVUTO (%s): %s\n", start.Format(time.RFC3339), cmd.Name, shown.Command)
+			}
+		}
 		output, runErr := local.Execute(cmd)
 		res := protocol.Result{ID: cmd.ID, Name: cmd.Name, StartedAt: start, FinishedAt: time.Now(), Output: output}
 		if runErr != nil {

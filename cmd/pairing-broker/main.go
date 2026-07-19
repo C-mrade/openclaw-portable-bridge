@@ -287,10 +287,10 @@ func (s *server) result(w http.ResponseWriter, r *http.Request) {
 	write(w, 200, map[string]string{"status": "accepted"})
 }
 func validCapabilities(v []string) bool {
-	if len(v) == 0 || len(v) > 14 {
+	if len(v) == 0 || len(v) > 15 {
 		return false
 	}
-	allowed := map[string]bool{"system.info": true, "system.network": true, "disk.list": true, "service.list": true, "process.list": true, "process.start": true, "process.stop-owned": true, "shell.run": true, "files.list": true, "files.read": true, "files.write": true, "files.upload": true, "files.download": true, "session.disconnect": true}
+	allowed := map[string]bool{"system.info": true, "system.network": true, "disk.list": true, "service.list": true, "process.list": true, "process.start": true, "process.stop-owned": true, "shell.run": true, "shell.run-admin": true, "files.list": true, "files.read": true, "files.write": true, "files.upload": true, "files.download": true, "session.disconnect": true}
 	seen := map[string]bool{}
 	for _, x := range v {
 		if !allowed[x] || seen[x] {

@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf16"
 )
 
 const MaxOutput = 1 << 20
@@ -123,6 +124,8 @@ func (e *Executor) Execute(cmd protocol.Command) (string, error) {
 		return e.processStop(cmd)
 	case "shell.run":
 		return e.shell(cmd)
+	case "shell.run-admin":
+		return e.shellAdmin(cmd)
 	case "files.list":
 		return e.filesList(cmd)
 	case "files.read", "files.download":
@@ -192,6 +195,58 @@ func (e *Executor) shell(c protocol.Command) (string, error) {
 		return marshalWithError(result, errors.New("command timeout"))
 	}
 	return marshalWithError(result, err)
+}
+
+func (e *Executor) shellAdmin(c protocol.Command) (string, error) {
+	if runtime.GOOS != "windows" {
+		return "", errors.New("administrator approval is currently supported only on Windows")
+	}
+	var p struct {
+		Command string `json:"command"`
+	}
+	if decode(c.Params, &p) != nil || p.Command == "" || len(p.Command) > 8192 || strings.IndexByte(p.Command, 0) >= 0 {
+		return "", errors.New("invalid administrator command")
+	}
+	outFile, err := os.CreateTemp("", "OpenClawBridge-admin-*.log")
+	if err != nil {
+		return "", err
+	}
+	outPath := outFile.Name()
+	_ = outFile.Close()
+	defer os.Remove(outPath)
+	command64 := base64.StdEncoding.EncodeToString([]byte(p.Command))
+	quotedOut := strings.ReplaceAll(outPath, "'", "''")
+	script := fmt.Sprintf("$cmd=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s')); & cmd.exe /d /s /c $cmd *> '%s'; exit $LASTEXITCODE", command64, quotedOut)
+	encodedScript := encodePowerShell(script)
+	launcher := fmt.Sprintf("$p=Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList '-NoProfile','-NonInteractive','-EncodedCommand','%s' -Wait -PassThru; exit $p.ExitCode", encodedScript)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout(c))
+	defer cancel()
+	x := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", launcher)
+	var parentOut capped
+	x.Stdout = &parentOut
+	x.Stderr = &parentOut
+	err = x.Run()
+	resultOut := parentOut.b.String()
+	if f, openErr := os.Open(outPath); openErr == nil {
+		defer f.Close()
+		data, _ := io.ReadAll(io.LimitReader(f, MaxOutput+1))
+		resultOut += string(data[:min(len(data), MaxOutput)])
+	}
+	result := map[string]any{"output": resultOut, "truncated": len(resultOut) > MaxOutput, "exitCode": exitCode(err), "uacRequired": true}
+	if ctx.Err() != nil {
+		return marshalWithError(result, errors.New("administrator command timeout or UAC not approved"))
+	}
+	return marshalWithError(result, err)
+}
+
+func encodePowerShell(s string) string {
+	words := utf16.Encode([]rune(s))
+	b := make([]byte, len(words)*2)
+	for i, word := range words {
+		b[i*2] = byte(word)
+		b[i*2+1] = byte(word >> 8)
+	}
+	return base64.StdEncoding.EncodeToString(b)
 }
 func exitCode(e error) int {
 	if e == nil {

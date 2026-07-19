@@ -4,9 +4,11 @@
 2. Double-click `OPENCLAW BRIDGE.exe`; no administrator rights are required.
 3. Choose **Information** or **Developer**. Information provides fixed,
    read-only system, network, disk, service and process inspections. It may
-   also read files from one directory selected locally. Developer requires
-   one selected directory and additionally permits user-level shell, process
-   and file changes.
+   also read files from one directory selected locally (use `C:\\` to grant
+   the whole system volume). Developer requires typing `SVILUPPATORE`, grants
+   terminal and file access across all available volumes with the current
+   user's rights, and exposes a separate administrator command capability.
+   Every administrator command displays a normal local Windows UAC prompt.
 4. Compare the six-character code shown locally with the approval channel.
 5. Approve once or for a bounded duration. Keep the console visible.
 6. Review every received command in the activity output.
