@@ -1,0 +1,28 @@
+name: Feature request
+description: Propose an improvement or integration
+title: "[Feature]: "
+labels: [enhancement, triage]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: textarea
+    id: security
+    attributes:
+      label: Consent and security impact
+      description: Explain capabilities, privilege, persistence, data access, and guest-visible behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

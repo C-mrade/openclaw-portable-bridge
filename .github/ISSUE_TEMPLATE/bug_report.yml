@@ -1,0 +1,42 @@
+name: Bug report
+description: Report a reproducible, non-sensitive defect
+title: "[Bug]: "
+labels: [bug, triage]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include tokens, private endpoints, device identifiers, or guest data. Report security vulnerabilities privately.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Guest platform
+      options: [Windows x64, Windows ARM64, Linux x64, Linux ARM64, macOS Intel, macOS Apple Silicon, Operator/broker, Other]
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What happened?
+      description: Include sanitized steps, expected behavior, and actual behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety check
+      options:
+        - label: I removed secrets, private endpoints, identifiers, and guest data.
+          required: true
+        - label: This is not a security vulnerability requiring private disclosure.
+          required: true

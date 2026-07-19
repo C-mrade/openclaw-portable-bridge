@@ -52,7 +52,7 @@ Verify the endpoint from a network outside the operator host before packaging.
 ```sh
 export BRIDGE_RELEASE_KEY_FILE=/secure/path/release.key
 export BRIDGE_RELEASE_PUBLIC_KEY='<public-key-from-keygen>'
-./scripts/build-release.sh 0.4.2-mvp-dev
+./scripts/build-release.sh 0.5.0-mvp-dev
 cp packaging/usb/config/bridge-public.example.json \
    packaging/usb/config/bridge-public.json
 ```
@@ -87,3 +87,6 @@ operator-side adapter. A polished approval CLI, Telegram buttons, and the
 official OpenClaw Node v4 adapter are not complete yet. Treat this repository
 as a development MVP until those pieces and the remaining adversarial tests are
 finished.
+
+For a short, end-to-end path with validation checkpoints, use
+[QUICKSTART.md](QUICKSTART.md) first.

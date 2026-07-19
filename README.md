@@ -66,7 +66,8 @@ There are two distinct environments:
    and publishes only that broker through HTTPS.
 2. **Windows guest:** runs the finished USB package with no prerequisites.
 
-For a reproducible self-hosted setup, follow [Deployment](docs/DEPLOYMENT.md).
+Start with the [operator quickstart](docs/QUICKSTART.md), then use the complete
+[Deployment](docs/DEPLOYMENT.md) guide for hardened or customized setups.
 For normal guest use, follow [Usage](docs/USAGE.md).
 
 ## Build and test
@@ -100,11 +101,21 @@ configuration, logs, and release keys are intentionally ignored by Git.
 - [Threat model](docs/THREAT_MODEL.md)
 - [Security operations](docs/SECURITY.md)
 - [Deployment and packaging](docs/DEPLOYMENT.md)
+- [Operator quickstart](docs/QUICKSTART.md)
 - [Agent integration](docs/AGENT_INTEGRATION.md)
 - [Usage](docs/USAGE.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [MVP test status](docs/TEST_REPORT.md)
 - [Changelog](CHANGELOG.md)
+- [Roadmap](ROADMAP.md)
+
+## Contributing
+
+Contributions are welcome, including documentation improvements, platform
+testing, security review, packaging, UI work, and agent integrations. Read
+[CONTRIBUTING.md](CONTRIBUTING.md) before opening an issue or pull request.
+Security vulnerabilities must be reported privately as described in
+[SECURITY.md](SECURITY.md).
 
 An installable agent skill is available at
 [`skills/openclaw-portable-bridge`](skills/openclaw-portable-bridge/SKILL.md).
