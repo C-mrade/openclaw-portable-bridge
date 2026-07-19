@@ -10,7 +10,8 @@ low-latency long polling.
 
 The current development release adds Windows Job Object containment for owned
 process trees, bounded chunked uploads, structured `powershell.run`, OEM and
-UTF-16 decoding, CLIXML filtering, and native ConPTY lifecycle primitives.
+UTF-16 decoding, CLIXML filtering, explicit UTF-8 input/output for Windows
+PowerShell 5.1, and native ConPTY lifecycle primitives.
 ConPTY is not yet exposed as a persistent remote terminal: process attachment,
 input/resize protocol messages, delivery acknowledgements, and backpressure
 remain required before that capability is advertised.

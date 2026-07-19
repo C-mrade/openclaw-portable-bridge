@@ -205,8 +205,15 @@ func (e *Executor) powerShell(c protocol.Command) (string, error) {
 	path := f.Name()
 	defer os.Remove(path)
 	// Windows PowerShell 5.1 treats UTF-8 files without a BOM as the active ANSI
-	// code page. Emit the BOM so scripts remain lossless on every supported host.
-	script := append([]byte{0xef, 0xbb, 0xbf}, []byte("$ProgressPreference='SilentlyContinue'\r\n"+p.Script)...)
+	// code page and inherits an OEM console encoding when stdout is redirected.
+	// Use a BOM for lossless script parsing and force UTF-8 for both native-command
+	// input and captured output so characters outside the OEM code page survive.
+	preamble := "$ProgressPreference='SilentlyContinue'\r\n" +
+		"$utf8 = New-Object System.Text.UTF8Encoding($false)\r\n" +
+		"[Console]::InputEncoding = $utf8\r\n" +
+		"[Console]::OutputEncoding = $utf8\r\n" +
+		"$OutputEncoding = $utf8\r\n"
+	script := append([]byte{0xef, 0xbb, 0xbf}, []byte(preamble+p.Script)...)
 	if _, err = f.Write(script); err != nil {
 		_ = f.Close()
 		return "", err

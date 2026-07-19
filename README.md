@@ -4,6 +4,13 @@ Experimental, security-first bridge for connecting a Windows 10/11 x64 guest
 to an operator-controlled broker without installing Python, Node.js, Docker,
 Git, Tailscale, or OpenClaw on the guest.
 
+> **Guest experience:** copy the prepared `OPENCLAW_BRIDGE` directory to a USB
+> drive, double-click `OPENCLAW BRIDGE.exe`, choose a profile, and approve the
+> pairing. The guest needs no installation, runtime, service, administrator
+> setup, or Tailscale client. The operator performs the one-time broker,
+> endpoint, and signing-key setup described in
+> [Deployment](docs/DEPLOYMENT.md).
+
 The project currently provides:
 
 - a standalone Go launcher that verifies an Ed25519-signed manifest and
@@ -36,6 +43,17 @@ the official OpenClaw Node v4 adapter, Authenticode signing, and the complete
 adversarial test matrix remain future work. Review
 [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) before exposing a broker publicly.
 
+## Quick start for operators
+
+There are two distinct environments:
+
+1. **Operator/server:** builds and signs the package, runs the loopback broker,
+   and publishes only that broker through HTTPS.
+2. **Windows guest:** runs the finished USB package with no prerequisites.
+
+For a reproducible self-hosted setup, follow [Deployment](docs/DEPLOYMENT.md).
+For normal guest use, follow [Usage](docs/USAGE.md).
+
 ## Build and test
 
 Go 1.24 or newer is recommended.
@@ -53,7 +71,7 @@ public key before building the Windows package:
 go run ./cmd/release-tool -mode keygen -key /secure/path/release.key
 export BRIDGE_RELEASE_KEY_FILE=/secure/path/release.key
 export BRIDGE_RELEASE_PUBLIC_KEY='<public-key-printed-by-keygen>'
-./scripts/build-release.sh 0.1.0
+./scripts/build-release.sh 0.4.2-mvp-dev
 ```
 
 Copy `packaging/usb/config/bridge-public.example.json` to
@@ -66,9 +84,11 @@ configuration, logs, and release keys are intentionally ignored by Git.
 - [Architecture](docs/ARCHITECTURE.md)
 - [Threat model](docs/THREAT_MODEL.md)
 - [Security operations](docs/SECURITY.md)
+- [Deployment and packaging](docs/DEPLOYMENT.md)
 - [Usage](docs/USAGE.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [MVP test status](docs/TEST_REPORT.md)
+- [Changelog](CHANGELOG.md)
 
 ## License
 

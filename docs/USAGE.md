@@ -1,6 +1,6 @@
 # Usage
 
-1. Insert the USB and open `OPENCLAW_BRIDGE`.
+1. Insert the prepared USB and open its `OPENCLAW_BRIDGE` directory.
 2. Double-click `OPENCLAW BRIDGE.exe`; no administrator rights are required.
 3. Choose **Information** or **Developer**. Information provides fixed,
    read-only system, network, disk, service and process inspections. It may
@@ -24,3 +24,8 @@ Configure your own HTTPS broker endpoint in `bridge-public.json`. Expose only
 the loopback pairing broker through a hardened TLS reverse proxy or Tailscale
 Funnel. Starting the launcher requires explicit local consent and a separate
 server-side approval before any capability becomes active.
+
+The public repository intentionally contains no ready-to-use operational
+configuration, private signing key, session token, or deployment-specific
+binary. Operators create their own signed USB package once; Windows guests only
+receive the resulting portable directory.

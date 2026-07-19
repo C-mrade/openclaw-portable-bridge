@@ -14,6 +14,8 @@ cp "$project_dir/docs/SECURITY.md" "$project_dir/packaging/usb/docs/SECURITY.md"
 cp "$project_dir/docs/USAGE.md" "$project_dir/packaging/usb/docs/USAGE.md"
 cp "$project_dir/docs/TROUBLESHOOTING.md" "$project_dir/packaging/usb/docs/TROUBLESHOOTING.md"
 cp "$project_dir/docs/TEST_REPORT.md" "$project_dir/packaging/usb/docs/TEST_REPORT.md"
+cp "$project_dir/docs/STATUS.md" "$project_dir/packaging/usb/docs/STATUS.md"
+cp "$project_dir/CHANGELOG.md" "$project_dir/packaging/usb/docs/CHANGELOG.md"
 docker run --rm -v "$project_dir:/src" -w /src "$image" sh -c \
   'export PATH=/usr/local/go/bin:$PATH; go test -buildvcs=false ./...; CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -buildvcs=false -trimpath -ldflags="-s -w" -o bin/bridge-client-windows-amd64.exe ./cmd/bridge-client'
 docker run --rm -v "$project_dir:/src" -v "$(dirname "$key_file"):/keys:ro" -w /src "$image" sh -c \
