@@ -136,10 +136,7 @@ func (e *Executor) Execute(cmd protocol.Command) (string, error) {
 		h, _ := os.Hostname()
 		return marshal(map[string]any{"hostname": h, "os": runtime.GOOS, "arch": runtime.GOARCH, "goVersion": runtime.Version()})
 	case "system.network":
-		if runtime.GOOS == "windows" {
-			return e.readOnlyCommand(cmd, []string{"ipconfig.exe", "/all"})
-		}
-		return e.readOnlyCommand(cmd, []string{"ip", "address"})
+		return e.readOnlyCommand(cmd, networkInventoryCommand())
 	case "disk.list":
 		if runtime.GOOS == "windows" {
 			return e.readOnlyCommand(cmd, []string{"powershell.exe", "-NoProfile", "-NonInteractive", "-Command", "Get-CimInstance Win32_LogicalDisk | Select-Object DeviceID,VolumeName,DriveType,FileSystem,Size,FreeSpace | ConvertTo-Json -Compress"})
@@ -148,6 +145,9 @@ func (e *Executor) Execute(cmd protocol.Command) (string, error) {
 	case "service.list":
 		if runtime.GOOS == "windows" {
 			return e.readOnlyCommand(cmd, []string{"powershell.exe", "-NoProfile", "-NonInteractive", "-Command", "Get-Service | Select-Object Name,DisplayName,Status,StartType | ConvertTo-Json -Compress"})
+		}
+		if runtime.GOOS == "darwin" {
+			return e.readOnlyCommand(cmd, []string{"launchctl", "list"})
 		}
 		return e.readOnlyCommand(cmd, []string{"systemctl", "list-units", "--type=service", "--all", "--no-pager", "--no-legend"})
 	case "process.list":
@@ -182,6 +182,20 @@ func (e *Executor) Execute(cmd protocol.Command) (string, error) {
 		return marshal(map[string]bool{"disconnect": true})
 	default:
 		return "", errors.New("unauthorized or unknown command")
+	}
+}
+
+func networkInventoryCommand() []string {
+	switch runtime.GOOS {
+	case "windows":
+		return []string{"ipconfig.exe", "/all"}
+	case "darwin":
+		return []string{"ifconfig", "-a"}
+	default:
+		if _, err := exec.LookPath("ip"); err == nil {
+			return []string{"ip", "address"}
+		}
+		return []string{"ifconfig", "-a"}
 	}
 }
 

@@ -47,7 +47,7 @@ directly to a public interface and do not expose an OpenClaw Gateway token.
 
 Verify the endpoint from a network outside the operator host before packaging.
 
-## 4. Build the signed USB directory
+## 4. Build the signed portable directory
 
 ```sh
 export BRIDGE_RELEASE_KEY_FILE=/secure/path/release.key
@@ -67,10 +67,18 @@ manifest or payload causes the launcher to refuse execution.
 
 ## 5. Guest operation
 
-The Windows 10/11 x64 guest only needs to double-click
-`OPENCLAW BRIDGE.exe`. The launcher verifies the signed payload, stages it in
-`%TEMP%`, keeps consent visible, and removes only its own temporary directory
-after exit. Normal operation does not install anything or require elevation.
+The build creates signed payloads and launchers for Windows amd64/arm64, Linux
+amd64/arm64, and macOS amd64/arm64. Select the launcher under
+`packaging/usb/launchers/<os>-<arch>` and keep the shared `payload` and `config`
+directories beside the launcher directory structure. The root Windows x64
+launcher is retained for the simplest USB experience.
+
+The launcher verifies the matching signed payload, stages it under the native
+temporary directory, keeps consent visible, and removes only its own temporary
+directory after exit. Normal operation does not install anything or require
+elevation. Linux/macOS removable media may be mounted `noexec`; in that case,
+copy the signed portable directory to a user-owned local folder before running
+it. Do not weaken mount security globally.
 
 ## Current approval interface
 

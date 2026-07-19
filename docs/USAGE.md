@@ -1,14 +1,17 @@
 # Usage
 
 1. Insert the prepared USB and open its `OPENCLAW_BRIDGE` directory.
-2. Double-click `OPENCLAW BRIDGE.exe`; no administrator rights are required.
+2. On Windows, double-click `OPENCLAW BRIDGE.exe`. On Linux or macOS, run the
+   matching launcher from a visible terminal. No administrator rights are
+   required.
 3. Choose **Information** or **Developer**. Information provides fixed,
    read-only system, network, disk, service and process inspections. It may
    also read files from one directory selected locally (use `C:\\` to grant
-   the whole system volume). Developer requires typing `SVILUPPATORE`, grants
+   the whole system volume). Developer requires typing `DEVELOPER`, grants
    terminal and file access across all available volumes with the current
    user's rights, and exposes a separate administrator command capability.
-   Every administrator command displays a normal local Windows UAC prompt.
+   On Windows, every administrator command displays a normal local UAC prompt.
+   Linux and macOS builds intentionally provide no remote elevation.
 4. Compare the six-character code shown locally with the approval channel.
 5. Approve once or for a bounded duration. Keep the console visible.
 6. Review every received command in the activity output.

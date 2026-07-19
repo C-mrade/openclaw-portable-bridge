@@ -55,7 +55,7 @@ func Hash(data []byte) string {
 	return hex.EncodeToString(h[:])
 }
 
-func LoadAndVerify(payloadDir string, pub ed25519.PublicKey) (Manifest, []byte, error) {
+func LoadAndVerify(payloadDir string, pub ed25519.PublicKey, expectedOS, expectedArch string) (Manifest, []byte, error) {
 	manifestBytes, err := os.ReadFile(filepath.Join(payloadDir, "manifest.json"))
 	if err != nil {
 		return Manifest{}, nil, fmt.Errorf("read manifest: %w", err)
@@ -68,7 +68,7 @@ func LoadAndVerify(payloadDir string, pub ed25519.PublicKey) (Manifest, []byte, 
 	if err := json.Unmarshal(manifestBytes, &m); err != nil {
 		return Manifest{}, nil, fmt.Errorf("parse manifest: %w", err)
 	}
-	if m.OS != "windows" || m.Architecture != "amd64" || filepath.Base(m.Filename) != m.Filename || m.Filename == "." {
+	if m.OS != expectedOS || m.Architecture != expectedArch || filepath.Base(m.Filename) != m.Filename || m.Filename == "." {
 		return Manifest{}, nil, errors.New("manifest target rejected")
 	}
 	payload, err := os.ReadFile(filepath.Join(payloadDir, m.Filename))

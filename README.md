@@ -1,11 +1,13 @@
 # OpenClaw Portable Bridge
 
-Experimental, security-first bridge for connecting a Windows 10/11 x64 guest
-to an operator-controlled broker without installing Python, Node.js, Docker,
-Git, Tailscale, or OpenClaw on the guest.
+Experimental, security-first bridge for connecting a guest computer to an
+operator-controlled broker without installing Python, Node.js, Docker, Git,
+Tailscale, or OpenClaw on the guest. Windows 10/11 x64 is the validated target;
+Windows ARM64, Linux x64/ARM64, and macOS Intel/Apple Silicon builds are now
+available as experimental targets.
 
 > **Guest experience:** copy the prepared `OPENCLAW_BRIDGE` directory to a USB
-> drive, double-click `OPENCLAW BRIDGE.exe`, choose a profile, and approve the
+> drive, launch the matching `OPENCLAW BRIDGE` binary, choose a profile, and approve the
 > pairing. The guest needs no installation, runtime, service, administrator
 > setup, or Tailscale client. The operator performs the one-time broker,
 > endpoint, and signing-key setup described in
@@ -28,10 +30,23 @@ The project currently provides:
 - an optional administrator command path that always invokes the normal local
   Windows UAC prompt.
 
-It does not install services on the guest, persist after exit, bypass Windows
-protections, or expose an OpenClaw Gateway token. Administrator execution is
-never automatic: Developer mode must be confirmed locally and each elevated
-command requires a separate UAC approval.
+It does not install services on the guest, persist after exit, bypass operating
+system protections, or expose an OpenClaw Gateway token. Administrator
+execution is never automatic: Developer mode must be confirmed locally and,
+on Windows, each elevated command requires a separate UAC approval.
+
+## Platform support
+
+| Platform | Build | Runtime validation | Elevation |
+| --- | --- | --- | --- |
+| Windows 10/11 x64 | supported | validated | local UAC per command |
+| Windows ARM64 | experimental | compile-tested | local UAC per command |
+| Linux x64/ARM64 | experimental | Linux x64 smoke-tested | not exposed |
+| macOS Intel/Apple Silicon | experimental | compile-tested | not exposed |
+
+All builds are standalone Go binaries. Linux and macOS currently use a visible
+terminal UI and user-level commands. macOS application bundles, notarization,
+and native graphical interfaces remain future work.
 
 ## Status
 
@@ -71,7 +86,7 @@ public key before building the Windows package:
 go run ./cmd/release-tool -mode keygen -key /secure/path/release.key
 export BRIDGE_RELEASE_KEY_FILE=/secure/path/release.key
 export BRIDGE_RELEASE_PUBLIC_KEY='<public-key-printed-by-keygen>'
-./scripts/build-release.sh 0.4.2-mvp-dev
+./scripts/build-release.sh 0.5.0-mvp-dev
 ```
 
 Copy `packaging/usb/config/bridge-public.example.json` to
@@ -85,10 +100,14 @@ configuration, logs, and release keys are intentionally ignored by Git.
 - [Threat model](docs/THREAT_MODEL.md)
 - [Security operations](docs/SECURITY.md)
 - [Deployment and packaging](docs/DEPLOYMENT.md)
+- [Agent integration](docs/AGENT_INTEGRATION.md)
 - [Usage](docs/USAGE.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [MVP test status](docs/TEST_REPORT.md)
 - [Changelog](CHANGELOG.md)
+
+An installable agent skill is available at
+[`skills/openclaw-portable-bridge`](skills/openclaw-portable-bridge/SKILL.md).
 
 ## License
 

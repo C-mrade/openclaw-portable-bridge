@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0-mvp-dev
+
+- Translate the launcher and client console experience to English.
+- Add signed launcher/client targets for Windows ARM64, Linux x64/ARM64, and
+  macOS Intel/Apple Silicon.
+- Add platform-aware capability profiles and native read-only inventory
+  commands for Linux and macOS.
+- Add an OpenClaw/Hermes-compatible operator skill and broker adapter reference.
+
 ## 0.4.2-mvp-dev
 
 - Force UTF-8 console input, output, and pipeline encoding for Windows

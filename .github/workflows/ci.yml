@@ -19,8 +19,27 @@ jobs:
       - run: go test ./...
       - run: go test -race ./...
       - run: go vet ./...
-      - run: CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o /tmp/bridge-client.exe ./cmd/bridge-client
-      - run: CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o '/tmp/OPENCLAW BRIDGE.exe' ./cmd/usb-launcher
+
+  cross-build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { os: windows, arch: amd64, suffix: .exe }
+          - { os: windows, arch: arm64, suffix: .exe }
+          - { os: linux, arch: amd64, suffix: '' }
+          - { os: linux, arch: arm64, suffix: '' }
+          - { os: darwin, arch: amd64, suffix: '' }
+          - { os: darwin, arch: arm64, suffix: '' }
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.24.x'
+          cache: false
+      - run: CGO_ENABLED=0 GOOS=${{ matrix.target.os }} GOARCH=${{ matrix.target.arch }} go build -o '/tmp/bridge-client${{ matrix.target.suffix }}' ./cmd/bridge-client
+      - run: CGO_ENABLED=0 GOOS=${{ matrix.target.os }} GOARCH=${{ matrix.target.arch }} go build -o '/tmp/OPENCLAW BRIDGE${{ matrix.target.suffix }}' ./cmd/usb-launcher
 
   windows-runtime:
     runs-on: windows-latest

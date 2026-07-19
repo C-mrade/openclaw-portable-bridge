@@ -29,7 +29,11 @@ func capabilities(p string) []string {
 	case "information":
 		return []string{"system.info", "system.network", "disk.list", "service.list", "process.list", "files.list", "files.read", "files.download", "session.disconnect"}
 	case "developer":
-		return []string{"system.info", "system.network", "disk.list", "service.list", "process.list", "process.start", "process.stop-owned", "shell.run", "shell.run-admin", "powershell.run", "shell.start", "shell.status", "shell.cancel", "files.list", "files.read", "files.read-chunk", "files.write", "files.write-chunk", "files.upload", "files.download", "session.disconnect"}
+		caps := []string{"system.info", "system.network", "disk.list", "service.list", "process.list", "process.start", "process.stop-owned", "shell.run", "shell.start", "shell.status", "shell.cancel", "files.list", "files.read", "files.read-chunk", "files.write", "files.write-chunk", "files.upload", "files.download", "session.disconnect"}
+		if runtime.GOOS == "windows" {
+			caps = append(caps, "shell.run-admin", "powershell.run")
+		}
+		return caps
 	case "custom":
 		return []string{"system.info", "session.disconnect"}
 	}
@@ -135,9 +139,14 @@ func main() {
 		if cmd.Name == "shell.run" || cmd.Name == "shell.run-admin" || cmd.Name == "powershell.run" || cmd.Name == "shell.start" {
 			var shown struct {
 				Command string `json:"command"`
+				Script  string `json:"script"`
 			}
 			if json.Unmarshal(cmd.Params, &shown) == nil {
-				fmt.Printf("[%s] COMANDO RICEVUTO (%s): %s\n", start.Format(time.RFC3339), cmd.Name, shown.Command)
+				detail := shown.Command
+				if detail == "" {
+					detail = shown.Script
+				}
+				fmt.Printf("[%s] COMMAND RECEIVED (%s): %s\n", start.Format(time.RFC3339), cmd.Name, detail)
 			}
 		}
 		output, runErr := local.Execute(cmd)

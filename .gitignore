@@ -2,6 +2,7 @@
 /*.jsonl
 /.tmp/
 /packaging/usb/OPENCLAW BRIDGE.exe
+/packaging/usb/launchers/
 /packaging/usb/SHA256SUMS.txt
 /packaging/usb/VERSION.txt
 /packaging/usb/config/bridge-public.json

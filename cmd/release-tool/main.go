@@ -19,6 +19,9 @@ func main() {
 	payload := flag.String("payload", "", "client executable")
 	out := flag.String("out", "", "release directory")
 	version := flag.String("version", "0.1.0", "release version")
+	targetOS := flag.String("target-os", "windows", "manifest operating system")
+	targetArch := flag.String("target-arch", "amd64", "manifest architecture")
+	filename := flag.String("filename", "bridge-client.exe", "payload filename in the manifest")
 	flag.Parse()
 	if *mode == "keygen" {
 		pub, priv, e := ed25519.GenerateKey(rand.Reader)
@@ -52,8 +55,11 @@ func main() {
 	if e = os.MkdirAll(*out, 0755); e != nil {
 		panic(e)
 	}
-	name := "bridge-client.exe"
-	m := release.Manifest{Version: *version, OS: "windows", Architecture: "amd64", Filename: name, SHA256: release.Hash(data), Size: int64(len(data)), Date: time.Now().UTC().Format(time.RFC3339), MinimumLauncher: "0.1.0", MinimumProtocol: 1}
+	name := filepath.Base(*filename)
+	if name == "." || name != *filename || (*targetOS != "windows" && *targetOS != "linux" && *targetOS != "darwin") || (*targetArch != "amd64" && *targetArch != "arm64") {
+		panic("invalid release target or filename")
+	}
+	m := release.Manifest{Version: *version, OS: *targetOS, Architecture: *targetArch, Filename: name, SHA256: release.Hash(data), Size: int64(len(data)), Date: time.Now().UTC().Format(time.RFC3339), MinimumLauncher: "0.1.0", MinimumProtocol: 1}
 	mb, _ := json.MarshalIndent(m, "", "  ")
 	mb = append(mb, '\n')
 	must(os.WriteFile(filepath.Join(*out, name), data, 0644))

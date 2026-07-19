@@ -19,11 +19,14 @@ func TestSignedReleaseAndTamper(t *testing.T) {
 	mustWrite(t, filepath.Join(d, "manifest.json.sig"), []byte(Sign(priv, mb)))
 	mustWrite(t, filepath.Join(d, m.Filename), payload)
 	mustWrite(t, filepath.Join(d, m.Filename+".sig"), []byte(Sign(priv, payload)))
-	if _, _, e := LoadAndVerify(d, pub); e != nil {
+	if _, _, e := LoadAndVerify(d, pub, "windows", "amd64"); e != nil {
 		t.Fatal(e)
 	}
+	if _, _, e := LoadAndVerify(d, pub, "linux", "amd64"); e == nil {
+		t.Fatal("manifest for the wrong operating system accepted")
+	}
 	mustWrite(t, filepath.Join(d, m.Filename), []byte("evil-client"))
-	if _, _, e := LoadAndVerify(d, pub); e == nil {
+	if _, _, e := LoadAndVerify(d, pub, "windows", "amd64"); e == nil {
 		t.Fatal("tampered payload accepted")
 	}
 }

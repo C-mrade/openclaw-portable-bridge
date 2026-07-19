@@ -1,0 +1,4 @@
+interface:
+  display_name: "OpenClaw Portable Bridge"
+  short_description: "Operate and integrate Portable Bridge sessions safely"
+  default_prompt: "Use $openclaw-portable-bridge to pair, inspect, operate, or troubleshoot a Portable Bridge session safely."

@@ -20,6 +20,11 @@ A Windows x64 proof of concept has exercised pairing, `system.info`, process
 listing, a harmless user-level shell command, scoped file operations,
 disconnect, signature rejection, and launcher-owned temporary cleanup.
 
+Linux x64 has compile and local smoke coverage. Linux ARM64, Windows ARM64,
+macOS Intel, and macOS Apple Silicon are cross-compiled and manifest-verified,
+but still require representative hardware acceptance testing. Non-Windows
+Developer mode provides user-level shell, process, and file capabilities only.
+
 Outstanding work includes a native graphical UI, complete ConPTY streaming, an
 OpenClaw Node v4 adapter, Telegram approval flow, Authenticode signing, and the
 remaining network and Windows adversarial test cases listed in `TEST_REPORT.md`.

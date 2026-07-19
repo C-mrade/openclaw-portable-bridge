@@ -1,4 +1,4 @@
-# Windows x64 MVP test status
+# MVP test status
 
 ## Passed in the reference deployment
 
@@ -23,6 +23,8 @@
 - Restrictive-network test matrix and HTTPS-port fallback.
 - Forced termination, USB removal, junction abuse, large-transfer, output
   truncation, cancellation, and concurrent-command live tests.
+- Runtime acceptance on Windows ARM64, Linux ARM64, and both macOS
+  architectures; macOS signing and notarization.
 
 Operators must repeat the full acceptance suite in their own environment; the
 results above are not a security certification.
