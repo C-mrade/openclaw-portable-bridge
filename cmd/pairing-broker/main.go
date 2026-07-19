@@ -41,7 +41,10 @@ func write(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 func limitedJSON(w http.ResponseWriter, r *http.Request, v any) bool {
-	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+	return limitedJSONN(w, r, v, 64<<10)
+}
+func limitedJSONN(w http.ResponseWriter, r *http.Request, v any, max int64) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, max)
 	d := json.NewDecoder(r.Body)
 	d.DisallowUnknownFields()
 	if d.Decode(v) != nil {
@@ -165,10 +168,14 @@ func (s *server) enqueue(w http.ResponseWriter, r *http.Request) {
 		RequestID string           `json:"requestId"`
 		Command   protocol.Command `json:"command"`
 	}
-	if !limitedJSON(w, r, &q) {
+	if !limitedJSONN(w, r, &q, 2<<20) {
 		return
 	}
-	if q.Command.ID == "" || !contains(s.capabilities(q.RequestID), q.Command.Name) || len(q.Command.Params) > (32<<10) {
+	maxParams := 32 << 10
+	if q.Command.Name == "files.write-chunk" {
+		maxParams = 2 << 20
+	}
+	if q.Command.ID == "" || !contains(s.capabilities(q.RequestID), q.Command.Name) || len(q.Command.Params) > maxParams {
 		write(w, 403, map[string]string{"error": "command not authorized"})
 		return
 	}
@@ -289,7 +296,7 @@ func (s *server) result(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = x
 	var q protocol.Result
-	if !limitedJSON(w, r, &q) {
+	if !limitedJSONN(w, r, &q, 3<<20) {
 		return
 	}
 	if !contains(x.Req.Requested, q.Name) || len(q.Output) > (2<<20) {

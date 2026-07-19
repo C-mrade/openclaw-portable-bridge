@@ -25,6 +25,7 @@ import (
 
 const MaxOutput = 1 << 20
 const MaxTransfer = 10 << 20
+const MaxChunk = 1 << 20
 
 type Executor struct {
 	roots []string
@@ -590,7 +591,7 @@ func (e *Executor) filesWriteChunk(c protocol.Command) (string, error) {
 		return "", errors.New("invalid write chunk request")
 	}
 	data, err := base64.StdEncoding.DecodeString(p.DataBase64)
-	if err != nil || len(data) > MaxTransfer {
+	if err != nil || len(data) > MaxChunk {
 		return "", errors.New("invalid or oversized chunk")
 	}
 	target, err := e.resolve(p.Path, true)
