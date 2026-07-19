@@ -17,6 +17,28 @@ jobs:
           go-version: '1.24.x'
           cache: false
       - run: go test ./...
+      - run: go test -race ./...
       - run: go vet ./...
       - run: CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o /tmp/bridge-client.exe ./cmd/bridge-client
       - run: CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o '/tmp/OPENCLAW BRIDGE.exe' ./cmd/usb-launcher
+
+  windows-runtime:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.24.x'
+          cache: false
+      - run: go test ./internal/executor
+      - run: go build ./cmd/bridge-client
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

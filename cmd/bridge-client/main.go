@@ -29,7 +29,7 @@ func capabilities(p string) []string {
 	case "information":
 		return []string{"system.info", "system.network", "disk.list", "service.list", "process.list", "files.list", "files.read", "files.download", "session.disconnect"}
 	case "developer":
-		return []string{"system.info", "system.network", "disk.list", "service.list", "process.list", "process.start", "process.stop-owned", "shell.run", "shell.run-admin", "shell.start", "shell.status", "shell.cancel", "files.list", "files.read", "files.read-chunk", "files.write", "files.write-chunk", "files.upload", "files.download", "session.disconnect"}
+		return []string{"system.info", "system.network", "disk.list", "service.list", "process.list", "process.start", "process.stop-owned", "shell.run", "shell.run-admin", "powershell.run", "shell.start", "shell.status", "shell.cancel", "files.list", "files.read", "files.read-chunk", "files.write", "files.write-chunk", "files.upload", "files.download", "session.disconnect"}
 	case "custom":
 		return []string{"system.info", "session.disconnect"}
 	}
@@ -132,7 +132,7 @@ func main() {
 			continue
 		}
 		start := time.Now()
-		if cmd.Name == "shell.run" || cmd.Name == "shell.run-admin" || cmd.Name == "shell.start" {
+		if cmd.Name == "shell.run" || cmd.Name == "shell.run-admin" || cmd.Name == "powershell.run" || cmd.Name == "shell.start" {
 			var shown struct {
 				Command string `json:"command"`
 			}

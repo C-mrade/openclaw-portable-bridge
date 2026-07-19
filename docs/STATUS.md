@@ -8,10 +8,17 @@ cancellable asynchronous shell jobs, output normalization, paginated directory
 listings, chunked transfers with SHA-256, consumable broker results, and
 low-latency long polling.
 
+The current development release adds Windows Job Object containment for owned
+process trees, bounded chunked uploads, structured `powershell.run`, OEM and
+UTF-16 decoding, CLIXML filtering, and native ConPTY lifecycle primitives.
+ConPTY is not yet exposed as a persistent remote terminal: process attachment,
+input/resize protocol messages, delivery acknowledgements, and backpressure
+remain required before that capability is advertised.
+
 A Windows x64 proof of concept has exercised pairing, `system.info`, process
 listing, a harmless user-level shell command, scoped file operations,
 disconnect, signature rejection, and launcher-owned temporary cleanup.
 
-Outstanding work includes a native graphical UI, ConPTY streaming, an
+Outstanding work includes a native graphical UI, complete ConPTY streaming, an
 OpenClaw Node v4 adapter, Telegram approval flow, Authenticode signing, and the
 remaining network and Windows adversarial test cases listed in `TEST_REPORT.md`.

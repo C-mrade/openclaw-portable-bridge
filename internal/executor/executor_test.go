@@ -52,6 +52,26 @@ func TestChunkedTransferAndPagination(t *testing.T) {
 	}
 }
 
+func TestChunkedTransferBoundsAndChecksumCleanup(t *testing.T) {
+	root := t.TempDir()
+	e, err := New([]string{root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(root, "bounded.bin")
+	oversized, _ := json.Marshal(map[string]any{"path": target, "offset": MaxTransfer, "dataBase64": "eA=="})
+	if _, err = e.Execute(protocol.Command{Name: "files.write-chunk", Params: oversized}); err == nil {
+		t.Fatal("chunk beyond total transfer limit accepted")
+	}
+	badSum, _ := json.Marshal(map[string]any{"path": target, "offset": 0, "dataBase64": "eA==", "final": true, "expectedSHA256": strings.Repeat("0", 64)})
+	if _, err = e.Execute(protocol.Command{Name: "files.write-chunk", Params: badSum}); err == nil {
+		t.Fatal("invalid checksum accepted")
+	}
+	if _, err = os.Stat(target + ".openclaw-part"); !os.IsNotExist(err) {
+		t.Fatalf("partial transfer survived checksum failure: %v", err)
+	}
+}
+
 func TestPathBoundaryAndNoOverwrite(t *testing.T) {
 	root := t.TempDir()
 	outside := t.TempDir()

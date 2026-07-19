@@ -30,22 +30,33 @@ const MaxChunk = 1 << 20
 type Executor struct {
 	roots []string
 	mu    sync.Mutex
-	owned map[int]*exec.Cmd
+	owned map[int]*ownedProcess
 	jobs  map[string]*job
 }
 
+type processContainer interface {
+	Terminate(uint32) error
+	Close() error
+}
+
+type ownedProcess struct {
+	cmd       *exec.Cmd
+	container processContainer
+}
+
 type job struct {
-	cmd      *exec.Cmd
-	cancel   context.CancelFunc
-	out      capped
-	done     chan struct{}
-	err      error
-	started  time.Time
-	finished time.Time
+	cmd       *exec.Cmd
+	container processContainer
+	cancel    context.CancelFunc
+	out       capped
+	done      chan struct{}
+	err       error
+	started   time.Time
+	finished  time.Time
 }
 
 func New(roots []string) (*Executor, error) {
-	e := &Executor{owned: map[int]*exec.Cmd{}, jobs: map[string]*job{}}
+	e := &Executor{owned: map[int]*ownedProcess{}, jobs: map[string]*job{}}
 	for _, r := range roots {
 		a, x := filepath.Abs(r)
 		if x != nil {
@@ -149,6 +160,8 @@ func (e *Executor) Execute(cmd protocol.Command) (string, error) {
 		return e.shell(cmd)
 	case "shell.run-admin":
 		return e.shellAdmin(cmd)
+	case "powershell.run":
+		return e.powerShell(cmd)
 	case "shell.start":
 		return e.shellStart(cmd)
 	case "shell.status":
@@ -170,6 +183,47 @@ func (e *Executor) Execute(cmd protocol.Command) (string, error) {
 	default:
 		return "", errors.New("unauthorized or unknown command")
 	}
+}
+
+// powerShell executes a script through a temporary UTF-8 file. Keeping the
+// script out of cmd.exe and PowerShell's command-line parser avoids nested
+// quoting bugs and the CLIXML progress stream emitted by -EncodedCommand.
+func (e *Executor) powerShell(c protocol.Command) (string, error) {
+	if runtime.GOOS != "windows" {
+		return "", errors.New("PowerShell execution is currently supported only on Windows")
+	}
+	var p struct {
+		Script string `json:"script"`
+	}
+	if decode(c.Params, &p) != nil || p.Script == "" || len(p.Script) > 64<<10 || strings.IndexByte(p.Script, 0) >= 0 {
+		return "", errors.New("invalid PowerShell script")
+	}
+	f, err := os.CreateTemp("", "OpenClawBridge-script-*.ps1")
+	if err != nil {
+		return "", err
+	}
+	path := f.Name()
+	defer os.Remove(path)
+	if _, err = f.Write([]byte("$ProgressPreference='SilentlyContinue'\r\n" + p.Script)); err != nil {
+		_ = f.Close()
+		return "", err
+	}
+	if err = f.Close(); err != nil {
+		return "", err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout(c))
+	defer cancel()
+	x := exec.CommandContext(ctx, "powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", path)
+	var out capped
+	x.Stdout = &out
+	x.Stderr = &out
+	err = x.Run()
+	raw, count := out.snapshot()
+	result := map[string]any{"output": normalizeOutput(raw), "truncated": count >= MaxOutput, "exitCode": exitCode(err)}
+	if ctx.Err() != nil {
+		return marshalWithError(result, errors.New("PowerShell timeout"))
+	}
+	return marshalWithError(result, err)
 }
 
 // readOnlyCommand executes a fixed, code-owned inspection command. Command names
@@ -275,7 +329,9 @@ func (e *Executor) shellAdmin(c protocol.Command) (string, error) {
 	return marshalWithError(result, err)
 }
 
-func normalizeOutput(data []byte) string {
+func normalizeOutput(data []byte) string { return normalizePlatformOutput(data) }
+
+func normalizePortableOutput(data []byte) string {
 	if len(data) >= 2 && ((data[0] == 0xff && data[1] == 0xfe) || bytes.Count(data, []byte{0}) > len(data)/4) {
 		if data[0] == 0xff && data[1] == 0xfe {
 			data = data[2:]
@@ -323,6 +379,13 @@ func (e *Executor) shellStart(c protocol.Command) (string, error) {
 		cancel()
 		return "", err
 	}
+	container, err := newProcessContainer(x.Process)
+	if err != nil {
+		_ = x.Process.Kill()
+		cancel()
+		return "", err
+	}
+	j.container = container
 	id := newID()
 	e.mu.Lock()
 	e.jobs[id] = j
@@ -330,8 +393,16 @@ func (e *Executor) shellStart(c protocol.Command) (string, error) {
 	go func() {
 		j.err = x.Wait()
 		j.finished = time.Now()
+		_ = j.container.Close()
 		cancel()
 		close(j.done)
+		time.AfterFunc(5*time.Minute, func() {
+			e.mu.Lock()
+			if e.jobs[id] == j {
+				delete(e.jobs, id)
+			}
+			e.mu.Unlock()
+		})
 	}()
 	return marshal(map[string]any{"jobId": id, "pid": x.Process.Pid, "startedAt": j.started})
 }
@@ -375,6 +446,9 @@ func (e *Executor) shellCancel(c protocol.Command) (string, error) {
 	e.mu.Unlock()
 	if j == nil {
 		return "", errors.New("job not found")
+	}
+	if j.container != nil {
+		_ = j.container.Terminate(1)
 	}
 	j.cancel()
 	return marshal(map[string]any{"jobId": p.JobID, "cancelled": true})
@@ -426,10 +500,21 @@ func (e *Executor) processStart(c protocol.Command) (string, error) {
 	if err := x.Start(); err != nil {
 		return "", err
 	}
+	container, err := newProcessContainer(x.Process)
+	if err != nil {
+		_ = x.Process.Kill()
+		return "", err
+	}
 	e.mu.Lock()
-	e.owned[x.Process.Pid] = x
+	e.owned[x.Process.Pid] = &ownedProcess{cmd: x, container: container}
 	e.mu.Unlock()
-	go func() { _ = x.Wait(); e.mu.Lock(); delete(e.owned, x.Process.Pid); e.mu.Unlock() }()
+	go func() {
+		_ = x.Wait()
+		_ = container.Close()
+		e.mu.Lock()
+		delete(e.owned, x.Process.Pid)
+		e.mu.Unlock()
+	}()
 	return marshal(map[string]int{"pid": x.Process.Pid})
 }
 func (e *Executor) processStop(c protocol.Command) (string, error) {
@@ -445,7 +530,7 @@ func (e *Executor) processStop(c protocol.Command) (string, error) {
 	if x == nil {
 		return "", errors.New("process is not owned by bridge")
 	}
-	return marshalWithError(map[string]int{"pid": p.PID}, x.Process.Kill())
+	return marshalWithError(map[string]int{"pid": p.PID}, x.container.Terminate(1))
 }
 func (e *Executor) filesList(c protocol.Command) (string, error) {
 	var p struct {
@@ -591,7 +676,7 @@ func (e *Executor) filesWriteChunk(c protocol.Command) (string, error) {
 		return "", errors.New("invalid write chunk request")
 	}
 	data, err := base64.StdEncoding.DecodeString(p.DataBase64)
-	if err != nil || len(data) > MaxChunk {
+	if err != nil || len(data) > MaxChunk || p.Offset+int64(len(data)) > int64(MaxTransfer) {
 		return "", errors.New("invalid or oversized chunk")
 	}
 	target, err := e.resolve(p.Path, true)
@@ -637,6 +722,7 @@ func (e *Executor) filesWriteChunk(c protocol.Command) (string, error) {
 	sum := sha256.Sum256(all)
 	actual := hex.EncodeToString(sum[:])
 	if !strings.EqualFold(actual, p.ExpectedSHA256) {
+		_ = os.Remove(part)
 		return "", errors.New("final SHA-256 mismatch")
 	}
 	if _, err = os.Lstat(target); err == nil {

@@ -315,7 +315,7 @@ func validCapabilities(v []string) bool {
 	if len(v) == 0 || len(v) > 20 {
 		return false
 	}
-	allowed := map[string]bool{"system.info": true, "system.network": true, "disk.list": true, "service.list": true, "process.list": true, "process.start": true, "process.stop-owned": true, "shell.run": true, "shell.run-admin": true, "shell.start": true, "shell.status": true, "shell.cancel": true, "files.list": true, "files.read": true, "files.read-chunk": true, "files.write": true, "files.write-chunk": true, "files.upload": true, "files.download": true, "session.disconnect": true}
+	allowed := map[string]bool{"system.info": true, "system.network": true, "disk.list": true, "service.list": true, "process.list": true, "process.start": true, "process.stop-owned": true, "shell.run": true, "shell.run-admin": true, "powershell.run": true, "shell.start": true, "shell.status": true, "shell.cancel": true, "files.list": true, "files.read": true, "files.read-chunk": true, "files.write": true, "files.write-chunk": true, "files.upload": true, "files.download": true, "session.disconnect": true}
 	seen := map[string]bool{}
 	for _, x := range v {
 		if !allowed[x] || seen[x] {

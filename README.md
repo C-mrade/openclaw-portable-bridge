@@ -14,9 +14,10 @@ The project currently provides:
 - explicit pairing approval, short-lived tokens, revocation, replay
   protection, rate limiting, capability profiles, scoped file access, and
   application audit logs;
-- cancellable asynchronous shell jobs, low-latency long polling, paginated
-  directory listings, resumable chunked transfers with SHA-256, and normalized
-  Windows output encoding;
+- cancellable asynchronous shell jobs contained in Windows Job Objects,
+  low-latency long polling, paginated directory listings, bounded resumable
+  transfers with SHA-256, structured PowerShell execution, OEM/UTF-16 output
+  decoding, and CLIXML filtering;
 - an optional administrator command path that always invokes the normal local
   Windows UAC prompt.
 
@@ -28,7 +29,9 @@ command requires a separate UAC approval.
 ## Status
 
 This is an MVP, not a production remote-management product. The current UI is
-a visible console. A native GUI, ConPTY streaming, Telegram approval buttons,
+a visible console. Native ConPTY primitives are present, but the persistent
+terminal protocol and UI are not complete. A native GUI, WebSocket streaming,
+Telegram approval buttons,
 the official OpenClaw Node v4 adapter, Authenticode signing, and the complete
 adversarial test matrix remain future work. Review
 [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) before exposing a broker publicly.
