@@ -312,7 +312,9 @@ func (s *server) result(w http.ResponseWriter, r *http.Request) {
 	write(w, 200, map[string]string{"status": "accepted"})
 }
 func validCapabilities(v []string) bool {
-	if len(v) == 0 || len(v) > 20 {
+	// Keep a small amount of headroom for additive protocol capabilities while
+	// still bounding pairing requests. The Developer profile currently uses 21.
+	if len(v) == 0 || len(v) > 32 {
 		return false
 	}
 	allowed := map[string]bool{"system.info": true, "system.network": true, "disk.list": true, "service.list": true, "process.list": true, "process.start": true, "process.stop-owned": true, "shell.run": true, "shell.run-admin": true, "powershell.run": true, "shell.start": true, "shell.status": true, "shell.cancel": true, "files.list": true, "files.read": true, "files.read-chunk": true, "files.write": true, "files.write-chunk": true, "files.upload": true, "files.download": true, "session.disconnect": true}
