@@ -100,6 +100,21 @@ func (e *Executor) Execute(cmd protocol.Command) (string, error) {
 	case "system.info":
 		h, _ := os.Hostname()
 		return marshal(map[string]any{"hostname": h, "os": runtime.GOOS, "arch": runtime.GOARCH, "goVersion": runtime.Version()})
+	case "system.network":
+		if runtime.GOOS == "windows" {
+			return e.readOnlyCommand(cmd, []string{"ipconfig.exe", "/all"})
+		}
+		return e.readOnlyCommand(cmd, []string{"ip", "address"})
+	case "disk.list":
+		if runtime.GOOS == "windows" {
+			return e.readOnlyCommand(cmd, []string{"powershell.exe", "-NoProfile", "-NonInteractive", "-Command", "Get-CimInstance Win32_LogicalDisk | Select-Object DeviceID,VolumeName,DriveType,FileSystem,Size,FreeSpace | ConvertTo-Json -Compress"})
+		}
+		return e.readOnlyCommand(cmd, []string{"df", "-P"})
+	case "service.list":
+		if runtime.GOOS == "windows" {
+			return e.readOnlyCommand(cmd, []string{"powershell.exe", "-NoProfile", "-NonInteractive", "-Command", "Get-Service | Select-Object Name,DisplayName,Status,StartType | ConvertTo-Json -Compress"})
+		}
+		return e.readOnlyCommand(cmd, []string{"systemctl", "list-units", "--type=service", "--all", "--no-pager", "--no-legend"})
 	case "process.list":
 		return e.processList(cmd)
 	case "process.start":
@@ -119,6 +134,26 @@ func (e *Executor) Execute(cmd protocol.Command) (string, error) {
 	default:
 		return "", errors.New("unauthorized or unknown command")
 	}
+}
+
+// readOnlyCommand executes a fixed, code-owned inspection command. Command names
+// and arguments never come from the remote request, so this remains read-only.
+func (e *Executor) readOnlyCommand(c protocol.Command, argv []string) (string, error) {
+	if len(c.Params) != 0 && string(c.Params) != "null" && string(c.Params) != "{}" {
+		return "", errors.New("inspection command does not accept parameters")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout(c))
+	defer cancel()
+	x := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	var out capped
+	x.Stdout = &out
+	x.Stderr = &out
+	err := x.Run()
+	result := map[string]any{"output": out.b.String(), "truncated": out.n >= MaxOutput, "exitCode": exitCode(err)}
+	if ctx.Err() != nil {
+		return marshalWithError(result, errors.New("inspection timeout"))
+	}
+	return marshalWithError(result, err)
 }
 func timeout(c protocol.Command) time.Duration {
 	d := 30 * time.Second

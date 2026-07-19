@@ -2,8 +2,11 @@
 
 1. Insert the USB and open `OPENCLAW_BRIDGE`.
 2. Double-click `OPENCLAW BRIDGE.exe`; no administrator rights are required.
-3. Choose **Information** or **Developer**. Developer requires typing one
-   existing directory that the Bridge may access.
+3. Choose **Information** or **Developer**. Information provides fixed,
+   read-only system, network, disk, service and process inspections. It may
+   also read files from one directory selected locally. Developer requires
+   one selected directory and additionally permits user-level shell, process
+   and file changes.
 4. Compare the six-character code shown locally with the approval channel.
 5. Approve once or for a bounded duration. Keep the console visible.
 6. Review every received command in the activity output.

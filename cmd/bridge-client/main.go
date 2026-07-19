@@ -27,9 +27,9 @@ func (s *stringList) Set(v string) error { *s = append(*s, v); return nil }
 func capabilities(p string) []string {
 	switch p {
 	case "information":
-		return []string{"system.info", "process.list", "session.disconnect"}
+		return []string{"system.info", "system.network", "disk.list", "service.list", "process.list", "files.list", "files.read", "files.download", "session.disconnect"}
 	case "developer":
-		return []string{"system.info", "process.list", "process.start", "process.stop-owned", "shell.run", "files.list", "files.read", "files.write", "files.upload", "files.download", "session.disconnect"}
+		return []string{"system.info", "system.network", "disk.list", "service.list", "process.list", "process.start", "process.stop-owned", "shell.run", "files.list", "files.read", "files.write", "files.upload", "files.download", "session.disconnect"}
 	case "custom":
 		return []string{"system.info", "session.disconnect"}
 	}

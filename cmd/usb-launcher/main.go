@@ -84,6 +84,18 @@ func run() error {
 			return errors.New("cartella consentita non valida")
 		}
 		args = []string{"-broker", cfg.BrokerURL, "-usb-id", cfg.USBID, "-profile", profile, "-allow-dir", root}
+	} else {
+		fmt.Println("Profilo Informazioni: inventario di sistema/rete/dischi/servizi e lettura file opzionale.")
+		fmt.Print("Cartella consultabile (INVIO per nessun accesso file): ")
+		readRoot, _ := reader.ReadString('\n')
+		readRoot = strings.TrimSpace(readRoot)
+		if readRoot != "" {
+			info, statErr := os.Stat(readRoot)
+			if statErr != nil || !info.IsDir() {
+				return errors.New("cartella consultabile non valida")
+			}
+			args = append(args, "-allow-dir", readRoot)
+		}
 	}
 	fmt.Printf("Avvio visibile con profilo %s. La sessione richiederà approvazione remota.\n", profile)
 	cmd := exec.Command(clientPath, args...)
