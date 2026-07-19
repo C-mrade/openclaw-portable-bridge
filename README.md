@@ -13,19 +13,25 @@ The project currently provides:
   Tailscale Funnel;
 - explicit pairing approval, short-lived tokens, revocation, replay
   protection, rate limiting, capability profiles, scoped file access, and
-  application audit logs.
+  application audit logs;
+- cancellable asynchronous shell jobs, low-latency long polling, paginated
+  directory listings, resumable chunked transfers with SHA-256, and normalized
+  Windows output encoding;
+- an optional administrator command path that always invokes the normal local
+  Windows UAC prompt.
 
-It does not install services on the guest, persist after exit, request
-administrator privileges, bypass Windows protections, or expose an OpenClaw
-Gateway token.
+It does not install services on the guest, persist after exit, bypass Windows
+protections, or expose an OpenClaw Gateway token. Administrator execution is
+never automatic: Developer mode must be confirmed locally and each elevated
+command requires a separate UAC approval.
 
 ## Status
 
 This is an MVP, not a production remote-management product. The current UI is
-a visible console. Telegram approval buttons, the official OpenClaw Node v4
-adapter, Authenticode signing, and the complete adversarial test matrix remain
-future work. Review [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) before exposing
-a broker publicly.
+a visible console. A native GUI, ConPTY streaming, Telegram approval buttons,
+the official OpenClaw Node v4 adapter, Authenticode signing, and the complete
+adversarial test matrix remain future work. Review
+[docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) before exposing a broker publicly.
 
 ## Build and test
 

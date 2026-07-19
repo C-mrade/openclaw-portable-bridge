@@ -24,6 +24,7 @@ type pending struct {
 	PairingTokenHash string
 	Queue            []protocol.Command
 	Results          []protocol.Result
+	CreatedAt        time.Time
 }
 type server struct {
 	mu    sync.Mutex
@@ -71,7 +72,7 @@ func (s *server) pair(w http.ResponseWriter, r *http.Request) {
 	id = auth.Hash(id)[:24]
 	rep := protocol.PairReply{RequestID: id, Status: "pending", CompareCode: auth.CompareCode(q.PublicKey, q.Nonce), PairingToken: pairingToken}
 	s.mu.Lock()
-	s.p[id] = &pending{Req: q, Reply: rep, PairingTokenHash: auth.Hash(pairingToken)}
+	s.p[id] = &pending{Req: q, Reply: rep, PairingTokenHash: auth.Hash(pairingToken), CreatedAt: time.Now().UTC()}
 	s.mu.Unlock()
 	s.audit.Event("pair_requested", map[string]any{"requestId": id, "usbId": q.USBID, "compareCode": rep.CompareCode, "source": r.RemoteAddr})
 	write(w, 202, rep)
@@ -174,7 +175,7 @@ func (s *server) enqueue(w http.ResponseWriter, r *http.Request) {
 	if q.Command.Deadline.IsZero() {
 		q.Command.Deadline = time.Now().Add(30 * time.Second)
 	}
-	if q.Command.Deadline.After(time.Now().Add(2 * time.Minute)) {
+	if q.Command.Deadline.After(time.Now().Add(time.Hour)) {
 		write(w, 400, nil)
 		return
 	}
@@ -235,7 +236,11 @@ func (s *server) adminResults(w http.ResponseWriter, r *http.Request) {
 		write(w, 404, nil)
 		return
 	}
-	write(w, 200, x.Results)
+	results := append([]protocol.Result(nil), x.Results...)
+	if r.URL.Query().Get("consume") == "true" {
+		x.Results = nil
+	}
+	write(w, 200, results)
 }
 func (s *server) session(w http.ResponseWriter, r *http.Request) (*pending, bool) {
 	tok := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
@@ -254,15 +259,28 @@ func (s *server) poll(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if len(x.Queue) == 0 {
-		w.WriteHeader(204)
-		return
+	deadline := time.Now().Add(25 * time.Second)
+	for {
+		s.mu.Lock()
+		if len(x.Queue) > 0 {
+			cmd := x.Queue[0]
+			x.Queue = x.Queue[1:]
+			s.mu.Unlock()
+			write(w, 200, cmd)
+			return
+		}
+		active := x.Reply.Status == "approved" && time.Now().Before(x.Reply.ExpiresAt)
+		s.mu.Unlock()
+		if !active || time.Now().After(deadline) {
+			w.WriteHeader(204)
+			return
+		}
+		select {
+		case <-r.Context().Done():
+			return
+		case <-time.After(100 * time.Millisecond):
+		}
 	}
-	cmd := x.Queue[0]
-	x.Queue = x.Queue[1:]
-	write(w, 200, cmd)
 }
 func (s *server) result(w http.ResponseWriter, r *http.Request) {
 	x, ok := s.session(w, r)
@@ -287,10 +305,10 @@ func (s *server) result(w http.ResponseWriter, r *http.Request) {
 	write(w, 200, map[string]string{"status": "accepted"})
 }
 func validCapabilities(v []string) bool {
-	if len(v) == 0 || len(v) > 15 {
+	if len(v) == 0 || len(v) > 20 {
 		return false
 	}
-	allowed := map[string]bool{"system.info": true, "system.network": true, "disk.list": true, "service.list": true, "process.list": true, "process.start": true, "process.stop-owned": true, "shell.run": true, "shell.run-admin": true, "files.list": true, "files.read": true, "files.write": true, "files.upload": true, "files.download": true, "session.disconnect": true}
+	allowed := map[string]bool{"system.info": true, "system.network": true, "disk.list": true, "service.list": true, "process.list": true, "process.start": true, "process.stop-owned": true, "shell.run": true, "shell.run-admin": true, "shell.start": true, "shell.status": true, "shell.cancel": true, "files.list": true, "files.read": true, "files.read-chunk": true, "files.write": true, "files.write-chunk": true, "files.upload": true, "files.download": true, "session.disconnect": true}
 	seen := map[string]bool{}
 	for _, x := range v {
 		if !allowed[x] || seen[x] {
@@ -320,6 +338,22 @@ func (s *server) revoke(w http.ResponseWriter, r *http.Request) {
 	s.audit.Event("session_revoked", map[string]any{})
 	write(w, 200, map[string]string{"status": "revoked"})
 }
+
+func (s *server) janitor() {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	for now := range ticker.C {
+		s.mu.Lock()
+		for id, x := range s.p {
+			pendingExpired := x.Reply.Status == "pending" && now.Sub(x.CreatedAt) > 10*time.Minute
+			sessionGone := (x.Reply.Status == "revoked" || (!x.Reply.ExpiresAt.IsZero() && now.After(x.Reply.ExpiresAt))) && now.Sub(x.CreatedAt) > 10*time.Minute
+			if pendingExpired || sessionGone {
+				delete(s.p, id)
+			}
+		}
+		s.mu.Unlock()
+	}
+}
 func main() {
 	listen := flag.String("listen", "127.0.0.1:17443", "")
 	logPath := flag.String("audit", "broker-audit.jsonl", "")
@@ -334,6 +368,7 @@ func main() {
 	}
 	defer a.Close()
 	s := &server{p: map[string]*pending{}, audit: a, admin: admin, seen: map[string]time.Time{}, rates: map[string][]time.Time{}}
+	go s.janitor()
 	http.HandleFunc("/v1/pair/request", s.pair)
 	http.HandleFunc("/v1/pair/status", s.status)
 	http.HandleFunc("/v1/admin/approve", s.approve)

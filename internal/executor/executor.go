@@ -3,7 +3,10 @@ package executor
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -27,10 +30,21 @@ type Executor struct {
 	roots []string
 	mu    sync.Mutex
 	owned map[int]*exec.Cmd
+	jobs  map[string]*job
+}
+
+type job struct {
+	cmd      *exec.Cmd
+	cancel   context.CancelFunc
+	out      capped
+	done     chan struct{}
+	err      error
+	started  time.Time
+	finished time.Time
 }
 
 func New(roots []string) (*Executor, error) {
-	e := &Executor{owned: map[int]*exec.Cmd{}}
+	e := &Executor{owned: map[int]*exec.Cmd{}, jobs: map[string]*job{}}
 	for _, r := range roots {
 		a, x := filepath.Abs(r)
 		if x != nil {
@@ -80,11 +94,14 @@ func decode(raw json.RawMessage, v any) error {
 }
 
 type capped struct {
-	b bytes.Buffer
-	n int
+	mu sync.Mutex
+	b  bytes.Buffer
+	n  int
 }
 
 func (c *capped) Write(p []byte) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	n := len(p)
 	remain := MaxOutput - c.n
 	if remain > 0 {
@@ -95,6 +112,11 @@ func (c *capped) Write(p []byte) (int, error) {
 		c.n += len(p)
 	}
 	return n, nil
+}
+func (c *capped) snapshot() ([]byte, int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]byte(nil), c.b.Bytes()...), c.n
 }
 func (e *Executor) Execute(cmd protocol.Command) (string, error) {
 	switch cmd.Name {
@@ -126,12 +148,22 @@ func (e *Executor) Execute(cmd protocol.Command) (string, error) {
 		return e.shell(cmd)
 	case "shell.run-admin":
 		return e.shellAdmin(cmd)
+	case "shell.start":
+		return e.shellStart(cmd)
+	case "shell.status":
+		return e.shellStatus(cmd)
+	case "shell.cancel":
+		return e.shellCancel(cmd)
 	case "files.list":
 		return e.filesList(cmd)
 	case "files.read", "files.download":
 		return e.filesRead(cmd)
+	case "files.read-chunk":
+		return e.filesReadChunk(cmd)
 	case "files.write", "files.upload":
 		return e.filesWrite(cmd)
+	case "files.write-chunk":
+		return e.filesWriteChunk(cmd)
 	case "session.disconnect":
 		return marshal(map[string]bool{"disconnect": true})
 	default:
@@ -152,7 +184,8 @@ func (e *Executor) readOnlyCommand(c protocol.Command, argv []string) (string, e
 	x.Stdout = &out
 	x.Stderr = &out
 	err := x.Run()
-	result := map[string]any{"output": out.b.String(), "truncated": out.n >= MaxOutput, "exitCode": exitCode(err)}
+	raw, count := out.snapshot()
+	result := map[string]any{"output": normalizeOutput(raw), "truncated": count >= MaxOutput, "exitCode": exitCode(err)}
 	if ctx.Err() != nil {
 		return marshalWithError(result, errors.New("inspection timeout"))
 	}
@@ -190,7 +223,8 @@ func (e *Executor) shell(c protocol.Command) (string, error) {
 	x.Stdout = &out
 	x.Stderr = &out
 	err := x.Run()
-	result := map[string]any{"output": out.b.String(), "truncated": out.n >= MaxOutput, "exitCode": exitCode(err)}
+	raw, count := out.snapshot()
+	result := map[string]any{"output": normalizeOutput(raw), "truncated": count >= MaxOutput, "exitCode": exitCode(err)}
 	if ctx.Err() != nil {
 		return marshalWithError(result, errors.New("command timeout"))
 	}
@@ -226,17 +260,123 @@ func (e *Executor) shellAdmin(c protocol.Command) (string, error) {
 	x.Stdout = &parentOut
 	x.Stderr = &parentOut
 	err = x.Run()
-	resultOut := parentOut.b.String()
+	parentRaw, _ := parentOut.snapshot()
+	resultOut := normalizeOutput(parentRaw)
 	if f, openErr := os.Open(outPath); openErr == nil {
 		defer f.Close()
 		data, _ := io.ReadAll(io.LimitReader(f, MaxOutput+1))
-		resultOut += string(data[:min(len(data), MaxOutput)])
+		resultOut += normalizeOutput(data[:min(len(data), MaxOutput)])
 	}
 	result := map[string]any{"output": resultOut, "truncated": len(resultOut) > MaxOutput, "exitCode": exitCode(err), "uacRequired": true}
 	if ctx.Err() != nil {
 		return marshalWithError(result, errors.New("administrator command timeout or UAC not approved"))
 	}
 	return marshalWithError(result, err)
+}
+
+func normalizeOutput(data []byte) string {
+	if len(data) >= 2 && ((data[0] == 0xff && data[1] == 0xfe) || bytes.Count(data, []byte{0}) > len(data)/4) {
+		if data[0] == 0xff && data[1] == 0xfe {
+			data = data[2:]
+		}
+		words := make([]uint16, 0, len(data)/2)
+		for i := 0; i+1 < len(data); i += 2 {
+			words = append(words, uint16(data[i])|uint16(data[i+1])<<8)
+		}
+		return string(utf16.Decode(words))
+	}
+	return strings.ToValidUTF8(string(data), "�")
+}
+
+func newID() string {
+	b := make([]byte, 12)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+func (e *Executor) shellStart(c protocol.Command) (string, error) {
+	var p struct {
+		Command        string `json:"command"`
+		TimeoutSeconds int    `json:"timeoutSeconds"`
+	}
+	if decode(c.Params, &p) != nil || p.Command == "" || len(p.Command) > 32768 || strings.IndexByte(p.Command, 0) >= 0 {
+		return "", errors.New("invalid asynchronous shell command")
+	}
+	if p.TimeoutSeconds <= 0 {
+		p.TimeoutSeconds = 300
+	}
+	if p.TimeoutSeconds > 3600 {
+		return "", errors.New("timeout exceeds one hour")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(p.TimeoutSeconds)*time.Second)
+	var x *exec.Cmd
+	if runtime.GOOS == "windows" {
+		x = exec.CommandContext(ctx, "cmd.exe", "/d", "/s", "/c", p.Command)
+	} else {
+		x = exec.CommandContext(ctx, "/bin/sh", "-c", p.Command)
+	}
+	j := &job{cmd: x, cancel: cancel, done: make(chan struct{}), started: time.Now()}
+	x.Stdout = &j.out
+	x.Stderr = &j.out
+	if err := x.Start(); err != nil {
+		cancel()
+		return "", err
+	}
+	id := newID()
+	e.mu.Lock()
+	e.jobs[id] = j
+	e.mu.Unlock()
+	go func() {
+		j.err = x.Wait()
+		j.finished = time.Now()
+		cancel()
+		close(j.done)
+	}()
+	return marshal(map[string]any{"jobId": id, "pid": x.Process.Pid, "startedAt": j.started})
+}
+
+func (e *Executor) shellStatus(c protocol.Command) (string, error) {
+	var p struct {
+		JobID  string `json:"jobId"`
+		Offset int    `json:"offset"`
+	}
+	if decode(c.Params, &p) != nil || p.JobID == "" || p.Offset < 0 {
+		return "", errors.New("invalid job status request")
+	}
+	e.mu.Lock()
+	j := e.jobs[p.JobID]
+	e.mu.Unlock()
+	if j == nil {
+		return "", errors.New("job not found")
+	}
+	raw, total := j.out.snapshot()
+	if p.Offset > len(raw) {
+		p.Offset = len(raw)
+	}
+	running := true
+	select {
+	case <-j.done:
+		running = false
+	default:
+	}
+	return marshal(map[string]any{"jobId": p.JobID, "running": running, "output": normalizeOutput(raw[p.Offset:]), "nextOffset": len(raw), "totalBytes": total, "exitCode": exitCode(j.err), "startedAt": j.started, "finishedAt": j.finished})
+}
+
+func (e *Executor) shellCancel(c protocol.Command) (string, error) {
+	var p struct {
+		JobID string `json:"jobId"`
+	}
+	if decode(c.Params, &p) != nil || p.JobID == "" {
+		return "", errors.New("invalid job cancellation request")
+	}
+	e.mu.Lock()
+	j := e.jobs[p.JobID]
+	e.mu.Unlock()
+	if j == nil {
+		return "", errors.New("job not found")
+	}
+	j.cancel()
+	return marshal(map[string]any{"jobId": p.JobID, "cancelled": true})
 }
 
 func encodePowerShell(s string) string {
@@ -308,10 +448,16 @@ func (e *Executor) processStop(c protocol.Command) (string, error) {
 }
 func (e *Executor) filesList(c protocol.Command) (string, error) {
 	var p struct {
-		Path string `json:"path"`
+		Path   string `json:"path"`
+		Offset int    `json:"offset"`
+		Limit  int    `json:"limit"`
+		Filter string `json:"filter"`
 	}
-	if decode(c.Params, &p) != nil {
+	if decode(c.Params, &p) != nil || p.Offset < 0 || p.Limit < 0 || p.Limit > 1000 {
 		return "", errors.New("invalid list request")
+	}
+	if p.Limit == 0 {
+		p.Limit = 200
 	}
 	path, x := e.resolve(p.Path, false)
 	if x != nil {
@@ -326,15 +472,23 @@ func (e *Executor) filesList(c protocol.Command) (string, error) {
 		Directory bool   `json:"directory"`
 		Size      int64  `json:"size"`
 	}
-	out := make([]item, 0, len(items))
+	out := make([]item, 0, min(len(items), p.Limit))
 	for _, v := range items {
+		if p.Filter != "" && !strings.Contains(strings.ToLower(v.Name()), strings.ToLower(p.Filter)) {
+			continue
+		}
 		z, _ := v.Info()
 		if z != nil {
 			out = append(out, item{v.Name(), v.IsDir(), z.Size()})
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
-	return marshal(out)
+	total := len(out)
+	if p.Offset > total {
+		p.Offset = total
+	}
+	end := min(total, p.Offset+p.Limit)
+	return marshal(map[string]any{"items": out[p.Offset:end], "offset": p.Offset, "limit": p.Limit, "total": total, "hasMore": end < total})
 }
 func (e *Executor) filesRead(c protocol.Command) (string, error) {
 	var p struct {
@@ -387,6 +541,113 @@ func (e *Executor) filesWrite(c protocol.Command) (string, error) {
 		return "", x
 	}
 	return marshal(map[string]int{"written": len(data)})
+}
+
+func (e *Executor) filesReadChunk(c protocol.Command) (string, error) {
+	var p struct {
+		Path   string `json:"path"`
+		Offset int64  `json:"offset"`
+		Limit  int    `json:"limit"`
+	}
+	if decode(c.Params, &p) != nil || p.Offset < 0 || p.Limit < 0 || p.Limit > MaxTransfer {
+		return "", errors.New("invalid read chunk request")
+	}
+	if p.Limit == 0 {
+		p.Limit = 1 << 20
+	}
+	path, err := e.resolve(p.Path, false)
+	if err != nil {
+		return "", err
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil || p.Offset > info.Size() {
+		return "", errors.New("offset outside file")
+	}
+	data := make([]byte, min(p.Limit, int(info.Size()-p.Offset)))
+	n, err := f.ReadAt(data, p.Offset)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return "", err
+	}
+	data = data[:n]
+	sum := sha256.Sum256(data)
+	return marshal(map[string]any{"dataBase64": base64.StdEncoding.EncodeToString(data), "offset": p.Offset, "nextOffset": p.Offset + int64(n), "size": info.Size(), "eof": p.Offset+int64(n) >= info.Size(), "chunkSHA256": hex.EncodeToString(sum[:])})
+}
+
+func (e *Executor) filesWriteChunk(c protocol.Command) (string, error) {
+	var p struct {
+		Path           string `json:"path"`
+		Offset         int64  `json:"offset"`
+		DataBase64     string `json:"dataBase64"`
+		Final          bool   `json:"final"`
+		ExpectedSHA256 string `json:"expectedSHA256"`
+	}
+	if decode(c.Params, &p) != nil || p.Offset < 0 {
+		return "", errors.New("invalid write chunk request")
+	}
+	data, err := base64.StdEncoding.DecodeString(p.DataBase64)
+	if err != nil || len(data) > MaxTransfer {
+		return "", errors.New("invalid or oversized chunk")
+	}
+	target, err := e.resolve(p.Path, true)
+	if err != nil {
+		return "", err
+	}
+	part := target + ".openclaw-part"
+	flags := os.O_WRONLY | os.O_CREATE
+	if p.Offset == 0 {
+		flags |= os.O_TRUNC
+	}
+	f, err := os.OpenFile(part, flags, 0600)
+	if err != nil {
+		return "", err
+	}
+	info, statErr := f.Stat()
+	if statErr != nil || info.Size() != p.Offset {
+		_ = f.Close()
+		return "", errors.New("chunk offset mismatch")
+	}
+	if _, err = f.Seek(p.Offset, io.SeekStart); err != nil {
+		_ = f.Close()
+		return "", err
+	}
+	_, err = f.Write(data)
+	closeErr := f.Close()
+	if err != nil {
+		return "", err
+	}
+	if closeErr != nil {
+		return "", closeErr
+	}
+	if !p.Final {
+		return marshal(map[string]any{"written": len(data), "nextOffset": p.Offset + int64(len(data)), "final": false})
+	}
+	if p.ExpectedSHA256 == "" {
+		return "", errors.New("final chunk requires expected SHA-256")
+	}
+	all, err := os.ReadFile(part)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(all)
+	actual := hex.EncodeToString(sum[:])
+	if !strings.EqualFold(actual, p.ExpectedSHA256) {
+		return "", errors.New("final SHA-256 mismatch")
+	}
+	if _, err = os.Lstat(target); err == nil {
+		return "", errors.New("refusing to overwrite existing file")
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return "", err
+	}
+	if err = os.Rename(part, target); err != nil {
+		return "", err
+	}
+	return marshal(map[string]any{"written": len(data), "size": len(all), "sha256": actual, "final": true})
 }
 func marshal(v any) (string, error) { b, e := json.Marshal(v); return string(b), e }
 func marshalWithError(v any, runErr error) (string, error) {

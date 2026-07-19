@@ -15,6 +15,11 @@
 7. Use `session.disconnect`, Ctrl+C, or close the window. The session token is
    revoked and launcher-owned `%TEMP%\\OpenClawBridge\\<session>` is removed.
 
+Developer automation can use `shell.start`, `shell.status`, and `shell.cancel`
+for long-running cancellable jobs. Large files can be transferred through
+`files.read-chunk` and `files.write-chunk`; final writes require the expected
+whole-file SHA-256. Directory listings accept `offset`, `limit`, and `filter`.
+
 Configure your own HTTPS broker endpoint in `bridge-public.json`. Expose only
 the loopback pairing broker through a hardened TLS reverse proxy or Tailscale
 Funnel. Starting the launcher requires explicit local consent and a separate
