@@ -204,7 +204,10 @@ func (e *Executor) powerShell(c protocol.Command) (string, error) {
 	}
 	path := f.Name()
 	defer os.Remove(path)
-	if _, err = f.Write([]byte("$ProgressPreference='SilentlyContinue'\r\n" + p.Script)); err != nil {
+	// Windows PowerShell 5.1 treats UTF-8 files without a BOM as the active ANSI
+	// code page. Emit the BOM so scripts remain lossless on every supported host.
+	script := append([]byte{0xef, 0xbb, 0xbf}, []byte("$ProgressPreference='SilentlyContinue'\r\n"+p.Script)...)
+	if _, err = f.Write(script); err != nil {
 		_ = f.Close()
 		return "", err
 	}

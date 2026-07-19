@@ -3,10 +3,29 @@
 package executor
 
 import (
+	"encoding/json"
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/C-mrade/openclaw-portable-bridge/internal/protocol"
 )
+
+func TestPowerShellRunPreservesUnicode(t *testing.T) {
+	e, err := New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	params, _ := json.Marshal(map[string]string{"script": "Write-Output 'Sì — èàòù'"})
+	out, err := e.Execute(protocol.Command{Name: "powershell.run", Params: params, Deadline: time.Now().Add(20 * time.Second)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Sì — èàòù") {
+		t.Fatalf("Unicode output was corrupted: %q", out)
+	}
+}
 
 func TestWindowsJobTerminatesAssignedProcess(t *testing.T) {
 	j, err := newWindowsJob()
