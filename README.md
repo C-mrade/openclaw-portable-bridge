@@ -57,6 +57,8 @@ Telegram approval buttons,
 the official OpenClaw Node v4 adapter, Authenticode signing, and the complete
 adversarial test matrix remain future work. Review
 [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) before exposing a broker publicly.
+The project's production invariants and release horizons are defined in the
+[Production vision](docs/PRODUCTION_VISION.md).
 
 ## Quick start for operators
 
@@ -98,6 +100,7 @@ configuration, logs, and release keys are intentionally ignored by Git.
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md)
+- [Production vision](docs/PRODUCTION_VISION.md)
 - [Threat model](docs/THREAT_MODEL.md)
 - [Security operations](docs/SECURITY.md)
 - [Deployment and packaging](docs/DEPLOYMENT.md)

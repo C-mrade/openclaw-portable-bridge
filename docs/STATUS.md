@@ -22,6 +22,12 @@ idempotent within each session, validates results against running commands,
 returns structured queue-pressure information, and keeps transient polling
 failures from closing and revoking an otherwise valid session.
 
+The broker still stores session, command, lease, and result state in memory.
+Restart recovery, authenticated public USB configuration, a dedicated updater,
+priority control traffic, and real network-failure injection are the immediate
+`0.6` work. These gates intentionally precede the guest GUI, Telegram approval,
+and model-facing adapters; see `PRODUCTION_VISION.md`.
+
 A Windows x64 proof of concept has exercised pairing, `system.info`, process
 listing, a harmless user-level shell command, scoped file operations,
 disconnect, signature rejection, and launcher-owned temporary cleanup.
