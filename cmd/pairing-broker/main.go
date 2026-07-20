@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/json"
 	"flag"
@@ -22,9 +23,16 @@ type pending struct {
 	Reply            protocol.PairReply
 	TokenHash        string
 	PairingTokenHash string
-	Queue            []protocol.Command
+	Queue            []string
+	Commands         map[string]*commandState
 	Results          []protocol.Result
 	CreatedAt        time.Time
+}
+type commandState struct {
+	Command     protocol.Command
+	Fingerprint [32]byte
+	Status      string
+	LeaseUntil  time.Time
 }
 type server struct {
 	mu    sync.Mutex
@@ -75,7 +83,7 @@ func (s *server) pair(w http.ResponseWriter, r *http.Request) {
 	id = auth.Hash(id)[:24]
 	rep := protocol.PairReply{RequestID: id, Status: "pending", CompareCode: auth.CompareCode(q.PublicKey, q.Nonce), PairingToken: pairingToken}
 	s.mu.Lock()
-	s.p[id] = &pending{Req: q, Reply: rep, PairingTokenHash: auth.Hash(pairingToken), CreatedAt: time.Now().UTC()}
+	s.p[id] = &pending{Req: q, Reply: rep, PairingTokenHash: auth.Hash(pairingToken), Commands: map[string]*commandState{}, CreatedAt: time.Now().UTC()}
 	s.mu.Unlock()
 	s.audit.Event("pair_requested", map[string]any{"requestId": id, "usbId": q.USBID, "compareCode": rep.CompareCode, "source": r.RemoteAddr})
 	write(w, 202, rep)
@@ -152,7 +160,9 @@ func (s *server) approve(w http.ResponseWriter, r *http.Request) {
 	x.Reply.Status = "approved"
 	x.Reply.SessionToken = tok
 	x.Reply.ExpiresAt = time.Now().UTC().Add(time.Duration(q.Minutes) * time.Minute)
-	x.Queue = append(x.Queue, protocol.Command{ID: "initial-system-info", Name: "system.info", Deadline: time.Now().Add(15 * time.Second)})
+	initial := protocol.Command{ID: "initial-system-info", Name: "system.info", Deadline: time.Now().Add(15 * time.Second)}
+	x.Commands[initial.ID] = newCommandState(initial)
+	x.Queue = append(x.Queue, initial.ID)
 	s.audit.Event("pair_approved", map[string]any{"requestId": q.RequestID, "minutes": q.Minutes})
 	write(w, 200, map[string]string{"status": "approved"})
 }
@@ -188,15 +198,44 @@ func (s *server) enqueue(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Lock()
 	x := s.p[q.RequestID]
-	if x == nil || x.Reply.Status != "approved" || len(x.Queue) >= 16 {
+	if x == nil || x.Reply.Status != "approved" {
 		s.mu.Unlock()
-		write(w, 409, nil)
+		write(w, 409, map[string]any{"error": "session not active"})
 		return
 	}
-	x.Queue = append(x.Queue, q.Command)
+	state := newCommandState(q.Command)
+	if existing := x.Commands[q.Command.ID]; existing != nil {
+		if existing.Fingerprint == state.Fingerprint {
+			status := existing.Status
+			s.mu.Unlock()
+			write(w, 200, map[string]any{"status": status, "commandId": q.Command.ID, "idempotent": true})
+			return
+		}
+		s.mu.Unlock()
+		write(w, 409, map[string]any{"error": "command ID already used with different payload", "commandId": q.Command.ID})
+		return
+	}
+	if len(x.Queue) >= 16 {
+		depth := len(x.Queue)
+		s.mu.Unlock()
+		w.Header().Set("Retry-After", "1")
+		write(w, 409, map[string]any{"error": "queue full", "queueDepth": depth, "queueLimit": 16, "retryAfterSeconds": 1})
+		return
+	}
+	x.Commands[q.Command.ID] = state
+	x.Queue = append(x.Queue, q.Command.ID)
+	depth := len(x.Queue)
 	s.mu.Unlock()
 	s.audit.Event("command_queued", map[string]any{"requestId": q.RequestID, "commandId": q.Command.ID, "name": q.Command.Name})
-	write(w, 202, map[string]string{"status": "queued"})
+	write(w, 202, map[string]any{"status": "queued", "commandId": q.Command.ID, "queueDepth": depth, "queueLimit": 16})
+}
+
+func newCommandState(cmd protocol.Command) *commandState {
+	b, _ := json.Marshal(struct {
+		Name   string          `json:"name"`
+		Params json.RawMessage `json:"params,omitempty"`
+	}{cmd.Name, cmd.Params})
+	return &commandState{Command: cmd, Fingerprint: sha256.Sum256(b), Status: "queued"}
 }
 func (s *server) capabilities(id string) []string {
 	s.mu.Lock()
@@ -269,9 +308,25 @@ func (s *server) poll(w http.ResponseWriter, r *http.Request) {
 	deadline := time.Now().Add(25 * time.Second)
 	for {
 		s.mu.Lock()
+		now := time.Now()
+		for id, state := range x.Commands {
+			if state.Status == "leased" && now.After(state.LeaseUntil) {
+				state.Status = "queued"
+				state.LeaseUntil = time.Time{}
+				x.Queue = append(x.Queue, id)
+			}
+		}
 		if len(x.Queue) > 0 {
-			cmd := x.Queue[0]
+			id := x.Queue[0]
 			x.Queue = x.Queue[1:]
+			state := x.Commands[id]
+			if state == nil || state.Status != "queued" {
+				s.mu.Unlock()
+				continue
+			}
+			state.Status = "leased"
+			state.LeaseUntil = time.Now().Add(10 * time.Second)
+			cmd := state.Command
 			s.mu.Unlock()
 			write(w, 200, cmd)
 			return
@@ -289,6 +344,35 @@ func (s *server) poll(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
+
+func (s *server) ack(w http.ResponseWriter, r *http.Request) {
+	x, ok := s.session(w, r)
+	if !ok {
+		return
+	}
+	var q struct {
+		CommandID string `json:"commandId"`
+	}
+	if !limitedJSON(w, r, &q) {
+		return
+	}
+	if q.CommandID == "" {
+		write(w, 400, map[string]string{"error": "commandId is required"})
+		return
+	}
+	s.mu.Lock()
+	state := x.Commands[q.CommandID]
+	if state == nil || state.Status != "leased" || time.Now().After(state.LeaseUntil) {
+		s.mu.Unlock()
+		write(w, 409, map[string]any{"error": "command lease is not active", "commandId": q.CommandID})
+		return
+	}
+	state.Status = "running"
+	state.LeaseUntil = time.Time{}
+	s.mu.Unlock()
+	s.audit.Event("command_acknowledged", map[string]any{"commandId": q.CommandID})
+	write(w, 200, map[string]any{"status": "running", "commandId": q.CommandID})
+}
 func (s *server) result(w http.ResponseWriter, r *http.Request) {
 	x, ok := s.session(w, r)
 	if !ok {
@@ -299,11 +383,18 @@ func (s *server) result(w http.ResponseWriter, r *http.Request) {
 	if !limitedJSONN(w, r, &q, 3<<20) {
 		return
 	}
-	if !contains(x.Req.Requested, q.Name) || len(q.Output) > (2<<20) {
+	if q.ID == "" || !contains(x.Req.Requested, q.Name) || len(q.Output) > (2<<20) {
 		write(w, 400, nil)
 		return
 	}
 	s.mu.Lock()
+	state := x.Commands[q.ID]
+	if state == nil || state.Command.Name != q.Name || state.Status != "running" {
+		s.mu.Unlock()
+		write(w, 409, map[string]any{"error": "result does not match a running command", "commandId": q.ID})
+		return
+	}
+	state.Status = "completed"
 	if len(x.Results) < 128 {
 		x.Results = append(x.Results, q)
 	}
@@ -385,8 +476,16 @@ func main() {
 	http.HandleFunc("/v1/admin/revoke", s.adminRevoke)
 	http.HandleFunc("/v1/admin/results", s.adminResults)
 	http.HandleFunc("/v1/session/poll", s.poll)
+	http.HandleFunc("/v1/session/ack", s.ack)
 	http.HandleFunc("/v1/session/result", s.result)
 	http.HandleFunc("/v1/session/revoke", s.revoke)
 	log.Printf("PoC broker listening on %s (loopback HTTP only)", *listen)
-	log.Fatal(http.ListenAndServe(*listen, nil))
+	httpServer := &http.Server{
+		Addr: *listen, Handler: nil,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       40 * time.Second,
+		WriteTimeout:      40 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+	log.Fatal(httpServer.ListenAndServe())
 }

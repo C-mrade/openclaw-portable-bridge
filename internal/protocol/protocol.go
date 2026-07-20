@@ -7,7 +7,9 @@ import (
 	"time"
 )
 
-const Version = 1
+// Version 2 adds delivery leases and mandatory acknowledgement before command
+// execution. Version 1 clients must be upgraded together with the broker.
+const Version = 2
 
 type PairRequest struct {
 	Protocol                                                     int `json:"protocol"`

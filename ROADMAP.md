@@ -9,6 +9,7 @@ what most improves safe, understandable adoption.
   results, and revocation.
 - Telegram approval flow built on the same typed adapter.
 - One-command deployment checks and package verification.
+- Durable recovery for acknowledged commands interrupted by a disconnect.
 - Protocol version negotiation and compatibility tests.
 
 ## Later

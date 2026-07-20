@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"github.com/C-mrade/openclaw-portable-bridge/internal/auth"
@@ -19,6 +20,10 @@ import (
 	"syscall"
 	"time"
 )
+
+type httpStatusError struct{ statusCode int }
+
+func (e httpStatusError) Error() string { return fmt.Sprintf("server status %d", e.statusCode) }
 
 type stringList []string
 
@@ -61,12 +66,38 @@ func call(method, url, token string, in, out any) error {
 		return nil
 	}
 	if resp.StatusCode/100 != 2 {
-		return fmt.Errorf("server status %s", resp.Status)
+		return httpStatusError{statusCode: resp.StatusCode}
 	}
 	if out != nil {
 		return json.NewDecoder(resp.Body).Decode(out)
 	}
 	return nil
+}
+
+// pollResilient keeps transient transport and server failures from turning a
+// brief network interruption into an intentional session revocation.
+func pollResilient(broker, token string, expiresAt time.Time, initialBackoff, maxBackoff time.Duration) (protocol.Command, error) {
+	backoff := initialBackoff
+	for {
+		if !expiresAt.IsZero() && !time.Now().Before(expiresAt) {
+			return protocol.Command{}, fmt.Errorf("session expired")
+		}
+		var cmd protocol.Command
+		err := call("POST", broker+"/v1/session/poll", token, map[string]string{}, &cmd)
+		if err == nil {
+			return cmd, nil
+		}
+		var statusErr httpStatusError
+		if errors.As(err, &statusErr) && (statusErr.statusCode == http.StatusUnauthorized || statusErr.statusCode == http.StatusForbidden || statusErr.statusCode == http.StatusNotFound || statusErr.statusCode == http.StatusGone) {
+			return protocol.Command{}, err
+		}
+		log.Printf("session poll failed; retrying in %s: %v", backoff, err)
+		time.Sleep(backoff)
+		backoff *= 2
+		if backoff > maxBackoff {
+			backoff = maxBackoff
+		}
+	}
 }
 func main() {
 	broker := flag.String("broker", "http://127.0.0.1:17443", "")
@@ -83,6 +114,7 @@ func main() {
 	if e != nil {
 		log.Fatal(e)
 	}
+	defer local.Close()
 	pub, priv, e := auth.NewIdentity()
 	if e != nil {
 		log.Fatal(e)
@@ -127,12 +159,17 @@ func main() {
 	}()
 	for {
 		var cmd protocol.Command
-		e = call("POST", *broker+"/v1/session/poll", rep.SessionToken, map[string]string{}, &cmd)
+		cmd, e = pollResilient(*broker, rep.SessionToken, rep.ExpiresAt, time.Second, 10*time.Second)
 		if e != nil {
+			log.Printf("session ended: %v", e)
 			break
 		}
 		if cmd.Name == "" {
 			time.Sleep(time.Second)
+			continue
+		}
+		if e = call("POST", *broker+"/v1/session/ack", rep.SessionToken, map[string]string{"commandId": cmd.ID}, nil); e != nil {
+			log.Printf("command %s was not acknowledged and will not be executed: %v", cmd.ID, e)
 			continue
 		}
 		start := time.Now()
@@ -161,6 +198,12 @@ func main() {
 		}
 	}
 	close(interrupted)
-	_ = call("POST", *broker+"/v1/session/revoke", rep.SessionToken, map[string]string{}, nil)
-	fmt.Println("DISCONNECTED; session token revoked")
+	// Do not turn an expiry or an authoritative server rejection into a fresh
+	// revoke request. Explicit user signals and session.disconnect revoke.
+	if e == nil {
+		_ = call("POST", *broker+"/v1/session/revoke", rep.SessionToken, map[string]string{}, nil)
+		fmt.Println("DISCONNECTED; session token revoked")
+	} else {
+		fmt.Println("DISCONNECTED; session token was not revoked by the client")
+	}
 }

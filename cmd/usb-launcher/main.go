@@ -113,6 +113,9 @@ func run() error {
 	}
 	fmt.Printf("Starting visibly with the %s profile. The session requires remote approval.\n", profile)
 	cmd := exec.Command(clientPath, args...)
+	// Never let the staged client inherit a removable USB directory as cwd.
+	// Child shells must remain usable after the drive is removed.
+	cmd.Dir = stage
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin

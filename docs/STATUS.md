@@ -16,6 +16,12 @@ ConPTY is not yet exposed as a persistent remote terminal: process attachment,
 input/resize protocol messages, delivery acknowledgements, and backpressure
 remain required before that capability is advertised.
 
+Release `0.5.1-mvp-dev` additionally fixes removable-drive current-directory
+failures, requires command-delivery acknowledgement, makes command IDs
+idempotent within each session, validates results against running commands,
+returns structured queue-pressure information, and keeps transient polling
+failures from closing and revoking an otherwise valid session.
+
 A Windows x64 proof of concept has exercised pairing, `system.info`, process
 listing, a harmless user-level shell command, scoped file operations,
 disconnect, signature rejection, and launcher-owned temporary cleanup.

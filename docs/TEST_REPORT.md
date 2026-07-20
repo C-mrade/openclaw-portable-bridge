@@ -14,6 +14,17 @@
 - Unit tests for signatures, path boundaries, traversal, no-overwrite, and
   token hashing.
 - Public TLS reverse-proxy path to a loopback-only broker.
+- Stable child-process working directory independent of the removable drive.
+- Idempotent retries, conflicting-ID rejection, delivery leases,
+  acknowledgement, result correlation, and structured queue saturation.
+- Transient poll failures retry with bounded backoff; authoritative session
+  rejection remains terminal and does not trigger a redundant client revoke.
+- Windows x64 protocol-v2 acceptance on `STANPC`: delivery ACK/result
+  correlation, stable bridge-owned working directory, Unicode PowerShell,
+  idempotent command replay and conflicting-ID rejection, resumable 600 KiB
+  transfer with final SHA-256, asynchronous process-tree cancellation, queue
+  saturation/backpressure, survival across multiple idle long-poll cycles,
+  cleanup, and explicit disconnect/revocation.
 
 ## Deferred
 

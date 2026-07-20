@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/C-mrade/openclaw-portable-bridge/internal/protocol"
 	"github.com/C-mrade/openclaw-portable-bridge/internal/release"
 	"os"
 	"path/filepath"
@@ -59,7 +60,7 @@ func main() {
 	if name == "." || name != *filename || (*targetOS != "windows" && *targetOS != "linux" && *targetOS != "darwin") || (*targetArch != "amd64" && *targetArch != "arm64") {
 		panic("invalid release target or filename")
 	}
-	m := release.Manifest{Version: *version, OS: *targetOS, Architecture: *targetArch, Filename: name, SHA256: release.Hash(data), Size: int64(len(data)), Date: time.Now().UTC().Format(time.RFC3339), MinimumLauncher: "0.1.0", MinimumProtocol: 1}
+	m := release.Manifest{Version: *version, OS: *targetOS, Architecture: *targetArch, Filename: name, SHA256: release.Hash(data), Size: int64(len(data)), Date: time.Now().UTC().Format(time.RFC3339), MinimumLauncher: "0.1.0", MinimumProtocol: protocol.Version}
 	mb, _ := json.MarshalIndent(m, "", "  ")
 	mb = append(mb, '\n')
 	must(os.WriteFile(filepath.Join(*out, name), data, 0644))

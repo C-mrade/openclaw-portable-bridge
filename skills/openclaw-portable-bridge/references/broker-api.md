@@ -17,6 +17,16 @@ A command has `ID`, `Name`, optional `params`, and an RFC3339 `Deadline`.
 Command IDs must be unique within the operator workflow. Set short deadlines
 for inspections and bounded deadlines for asynchronous jobs.
 
+Command submission is idempotent within a session. Reusing an ID with the same
+name and parameters returns the existing state; reusing it with a different
+payload returns `409`. Queue saturation also returns `409` with `queueDepth`,
+`queueLimit`, `retryAfterSeconds`, and a matching `Retry-After` header.
+
+The guest delivery flow is `poll -> ack -> execute -> result`. A polled command
+has a short lease and is requeued if the guest does not acknowledge it. Results
+are accepted only for an acknowledged running command with the matching ID and
+name.
+
 ## Common parameter shapes
 
 ```json

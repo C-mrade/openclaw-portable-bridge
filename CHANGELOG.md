@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.5.1-mvp-dev
+
+- Give the staged client and every child process a stable bridge-owned working
+  directory so shells continue working when the USB directory disappears.
+- Add idempotent command IDs and reject conflicting reuse of an existing ID.
+- Add delivery leases and explicit client acknowledgement before execution;
+  unacknowledged deliveries return to the queue.
+- Correlate results with acknowledged running commands and reject duplicate or
+  unsolicited results.
+- Return structured queue depth, limit, and retry information.
+- Distinguish cancellation requests from jobs that already completed.
+- Configure explicit HTTP read, write, header, and idle timeouts.
+- Retry transient long-poll failures with bounded exponential backoff instead
+  of converting a brief disconnect into a client-initiated revocation.
+- Advance the wire protocol to version 2; broker and guest must be upgraded
+  together.
+
 ## 0.5.0-mvp-dev
 
 - Translate the launcher and client console experience to English.

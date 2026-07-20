@@ -28,10 +28,11 @@ const MaxTransfer = 10 << 20
 const MaxChunk = 1 << 20
 
 type Executor struct {
-	roots []string
-	mu    sync.Mutex
-	owned map[int]*ownedProcess
-	jobs  map[string]*job
+	roots   []string
+	workDir string
+	mu      sync.Mutex
+	owned   map[int]*ownedProcess
+	jobs    map[string]*job
 }
 
 type processContainer interface {
@@ -56,19 +57,33 @@ type job struct {
 }
 
 func New(roots []string) (*Executor, error) {
-	e := &Executor{owned: map[int]*ownedProcess{}, jobs: map[string]*job{}}
+	workDir, err := os.MkdirTemp("", "OpenClawBridge-work-*")
+	if err != nil {
+		return nil, fmt.Errorf("create stable work directory: %w", err)
+	}
+	e := &Executor{workDir: workDir, owned: map[int]*ownedProcess{}, jobs: map[string]*job{}}
 	for _, r := range roots {
 		a, x := filepath.Abs(r)
 		if x != nil {
+			_ = os.RemoveAll(workDir)
 			return nil, x
 		}
 		a, x = filepath.EvalSymlinks(a)
 		if x != nil {
+			_ = os.RemoveAll(workDir)
 			return nil, fmt.Errorf("allowed directory %q: %w", r, x)
 		}
 		e.roots = append(e.roots, filepath.Clean(a))
 	}
 	return e, nil
+}
+
+// Close removes only the bridge-owned per-session working directory.
+func (e *Executor) Close() error { return os.RemoveAll(e.workDir) }
+
+func (e *Executor) prepare(x *exec.Cmd) *exec.Cmd {
+	x.Dir = e.workDir
+	return x
 }
 func (e *Executor) resolve(path string, forWrite bool) (string, error) {
 	if path == "" || strings.IndexByte(path, 0) >= 0 {
@@ -237,7 +252,7 @@ func (e *Executor) powerShell(c protocol.Command) (string, error) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout(c))
 	defer cancel()
-	x := exec.CommandContext(ctx, "powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", path)
+	x := e.prepare(exec.CommandContext(ctx, "powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", path))
 	var out capped
 	x.Stdout = &out
 	x.Stderr = &out
@@ -258,7 +273,7 @@ func (e *Executor) readOnlyCommand(c protocol.Command, argv []string) (string, e
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout(c))
 	defer cancel()
-	x := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	x := e.prepare(exec.CommandContext(ctx, argv[0], argv[1:]...))
 	var out capped
 	x.Stdout = &out
 	x.Stderr = &out
@@ -298,6 +313,7 @@ func (e *Executor) shell(c protocol.Command) (string, error) {
 	} else {
 		x = exec.CommandContext(ctx, "/bin/sh", "-c", p.Command)
 	}
+	e.prepare(x)
 	var out capped
 	x.Stdout = &out
 	x.Stderr = &out
@@ -334,7 +350,7 @@ func (e *Executor) shellAdmin(c protocol.Command) (string, error) {
 	launcher := fmt.Sprintf("$p=Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList '-NoProfile','-NonInteractive','-EncodedCommand','%s' -Wait -PassThru; exit $p.ExitCode", encodedScript)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout(c))
 	defer cancel()
-	x := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", launcher)
+	x := e.prepare(exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", launcher))
 	var parentOut capped
 	x.Stdout = &parentOut
 	x.Stderr = &parentOut
@@ -396,6 +412,7 @@ func (e *Executor) shellStart(c protocol.Command) (string, error) {
 	} else {
 		x = exec.CommandContext(ctx, "/bin/sh", "-c", p.Command)
 	}
+	e.prepare(x)
 	j := &job{cmd: x, cancel: cancel, done: make(chan struct{}), started: time.Now()}
 	x.Stdout = &j.out
 	x.Stderr = &j.out
@@ -471,11 +488,18 @@ func (e *Executor) shellCancel(c protocol.Command) (string, error) {
 	if j == nil {
 		return "", errors.New("job not found")
 	}
+	select {
+	case <-j.done:
+		return marshal(map[string]any{"jobId": p.JobID, "status": "already_completed", "cancelled": false})
+	default:
+	}
 	if j.container != nil {
-		_ = j.container.Terminate(1)
+		if err := j.container.Terminate(1); err != nil {
+			return marshalWithError(map[string]any{"jobId": p.JobID, "status": "termination_failed", "cancelled": false}, err)
+		}
 	}
 	j.cancel()
-	return marshal(map[string]any{"jobId": p.JobID, "cancelled": true})
+	return marshal(map[string]any{"jobId": p.JobID, "status": "cancel_requested", "cancelled": true})
 }
 
 func encodePowerShell(s string) string {
@@ -506,6 +530,7 @@ func (e *Executor) processList(c protocol.Command) (string, error) {
 	} else {
 		x = exec.CommandContext(ctx, "ps", "-eo", "pid=,comm=")
 	}
+	e.prepare(x)
 	var out capped
 	x.Stdout = &out
 	x.Stderr = &out
@@ -520,7 +545,7 @@ func (e *Executor) processStart(c protocol.Command) (string, error) {
 	if decode(c.Params, &p) != nil || p.Program == "" {
 		return "", errors.New("invalid process request")
 	}
-	x := exec.Command(p.Program, p.Args...)
+	x := e.prepare(exec.Command(p.Program, p.Args...))
 	if err := x.Start(); err != nil {
 		return "", err
 	}

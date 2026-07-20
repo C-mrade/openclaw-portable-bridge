@@ -103,6 +103,29 @@ func TestTraversalRejected(t *testing.T) {
 		t.Fatal("traversal accepted")
 	}
 }
+
+func TestCommandsUseStableOwnedWorkingDirectory(t *testing.T) {
+	e, err := New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workDir := e.workDir
+	defer e.Close()
+	if info, err := os.Stat(workDir); err != nil || !info.IsDir() {
+		t.Fatalf("missing work directory: %v", err)
+	}
+	params, _ := json.Marshal(map[string]string{"command": "pwd"})
+	result, err := e.Execute(protocol.Command{Name: "shell.run", Params: params})
+	if err != nil || !strings.Contains(result, workDir) {
+		t.Fatalf("shell did not use stable work directory: %q, %v", result, err)
+	}
+	if err := e.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(workDir); !os.IsNotExist(err) {
+		t.Fatalf("work directory survived close: %v", err)
+	}
+}
 func mustRead(t *testing.T, p string) []byte {
 	t.Helper()
 	b, e := os.ReadFile(p)

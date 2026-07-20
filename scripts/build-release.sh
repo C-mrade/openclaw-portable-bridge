@@ -7,6 +7,8 @@ version="${1:-0.1.0-mvp-dev}"
 image="golang:1.24-bookworm"
 container_user="$(id -u):$(id -g)"
 
+printf '%s\n' "$version" > "$project_dir/packaging/usb/VERSION.txt"
+
 test -f "$key_file"
 mkdir -p "$project_dir/bin" "$project_dir/packaging/usb/payload" "$project_dir/packaging/usb/launchers"
 mkdir -p "$project_dir/packaging/usb/docs"
