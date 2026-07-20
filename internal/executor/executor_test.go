@@ -8,7 +8,6 @@ import (
 	"github.com/C-mrade/openclaw-portable-bridge/internal/protocol"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -115,14 +114,15 @@ func TestCommandsUseStableOwnedWorkingDirectory(t *testing.T) {
 	if info, err := os.Stat(workDir); err != nil || !info.IsDir() {
 		t.Fatalf("missing work directory: %v", err)
 	}
-	command := "pwd"
-	if runtime.GOOS == "windows" {
-		command = "cd"
-	}
-	params, _ := json.Marshal(map[string]string{"command": command})
+	const marker = "bridge-workdir-test.txt"
+	params, _ := json.Marshal(map[string]string{"command": "echo stable > " + marker})
 	result, err := e.Execute(protocol.Command{Name: "shell.run", Params: params})
-	if err != nil || !strings.Contains(strings.ToLower(result), strings.ToLower(workDir)) {
+	if err != nil {
 		t.Fatalf("shell did not use stable work directory: %q, %v", result, err)
+	}
+	contents, err := os.ReadFile(filepath.Join(workDir, marker))
+	if err != nil || strings.TrimSpace(string(contents)) != "stable" {
+		t.Fatalf("shell marker missing from stable work directory: %q, %v", contents, err)
 	}
 	if err := e.Close(); err != nil {
 		t.Fatal(err)
