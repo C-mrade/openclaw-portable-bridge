@@ -52,18 +52,25 @@ Verify the endpoint from a network outside the operator host before packaging.
 ```sh
 export BRIDGE_RELEASE_KEY_FILE=/secure/path/release.key
 export BRIDGE_RELEASE_PUBLIC_KEY='<public-key-from-keygen>'
-./scripts/build-release.sh 0.5.0-mvp-dev
 cp packaging/usb/config/bridge-public.example.json \
    packaging/usb/config/bridge-public.json
 ```
 
 Edit `bridge-public.json` with the public HTTPS broker URL and a non-secret USB
-identifier. Copy the entire generated `packaging/usb` directory to a dedicated
+identifier, then run:
+
+```sh
+./scripts/build-release.sh 0.5.2-mvp-dev
+```
+
+The build signs that configuration and refuses to publish a partial release.
+Changing it later requires rebuilding or explicitly re-signing it with the
+release key. Copy the entire generated `packaging/usb` directory to a dedicated
 `OPENCLAW_BRIDGE` directory on the USB. Preserve unrelated files already on the
 drive.
 
-Before distribution, verify `SHA256SUMS.txt` and test that modifying either the
-manifest or payload causes the launcher to refuse execution.
+Before distribution, verify `SHA256SUMS.txt` and test that modifying the public
+configuration, manifest, or payload causes the launcher to refuse execution.
 
 ## 5. Guest operation
 

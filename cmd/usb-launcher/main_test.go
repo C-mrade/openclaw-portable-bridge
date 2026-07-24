@@ -1,6 +1,9 @@
 package main
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
+	"github.com/C-mrade/openclaw-portable-bridge/internal/release"
 	"os"
 	"path/filepath"
 	"testing"
@@ -29,6 +32,38 @@ func TestSupportedTargets(t *testing.T) {
 	}
 	if supportedTarget("freebsd", "amd64") || supportedTarget("linux", "386") {
 		t.Fatal("unsupported target accepted")
+	}
+}
+
+func TestDefaultLauncherVersionIsNotReleaseCompatible(t *testing.T) {
+	if release.VersionAtLeast(launcherVersion, "0.1.0") {
+		t.Fatalf("development launcher version %q unexpectedly accepted", launcherVersion)
+	}
+}
+
+func TestLoadPublicConfigRequiresValidSignature(t *testing.T) {
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	mustMkdir(t, filepath.Join(root, "config"))
+	config := []byte(`{"usbId":"test-usb","brokerUrl":"https://bridge.example.test"}`)
+	configPath := filepath.Join(root, "config", "bridge-public.json")
+	if err := os.WriteFile(configPath, config, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath+".sig", []byte(release.Sign(priv, config)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadPublicConfig(root, pub); err != nil {
+		t.Fatalf("valid signed config rejected: %v", err)
+	}
+	if err := os.WriteFile(configPath, append(config, '\n'), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadPublicConfig(root, pub); err == nil {
+		t.Fatal("tampered public config accepted")
 	}
 }
 

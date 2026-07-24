@@ -4,6 +4,10 @@
 
 - Static Windows x64 client and launcher with no guest runtime dependency.
 - Signed manifest and payload verification; modified payload rejected.
+- Signed public configuration verification; modified endpoint or USB identity
+  rejected before network access.
+- Clean staged release assembly, complete checksum verification, and
+  mixed-version package rejection.
 - Authentic payload staged under `%TEMP%` and removed after exit.
 - Ephemeral Ed25519 pairing, comparison code, approval, expiry, and distinct
   pairing/session tokens.

@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 )
 
 type Manifest struct {
@@ -55,6 +57,50 @@ func Hash(data []byte) string {
 	return hex.EncodeToString(h[:])
 }
 
+// VersionAtLeast compares the numeric core of dotted release versions.
+// Development suffixes (for example "-mvp-dev") do not affect compatibility.
+func VersionAtLeast(current, minimum string) bool {
+	currentParts, currentOK := numericVersion(current)
+	minimumParts, minimumOK := numericVersion(minimum)
+	if !currentOK || !minimumOK {
+		return false
+	}
+	length := max(len(currentParts), len(minimumParts))
+	for i := range length {
+		var left, right int
+		if i < len(currentParts) {
+			left = currentParts[i]
+		}
+		if i < len(minimumParts) {
+			right = minimumParts[i]
+		}
+		if left != right {
+			return left > right
+		}
+	}
+	return true
+}
+
+func numericVersion(value string) ([]int, bool) {
+	core := strings.SplitN(strings.TrimPrefix(strings.TrimSpace(value), "v"), "-", 2)[0]
+	if core == "" {
+		return nil, false
+	}
+	raw := strings.Split(core, ".")
+	parts := make([]int, len(raw))
+	for i, part := range raw {
+		if part == "" {
+			return nil, false
+		}
+		number, err := strconv.Atoi(part)
+		if err != nil || number < 0 {
+			return nil, false
+		}
+		parts[i] = number
+	}
+	return parts, true
+}
+
 func LoadAndVerify(payloadDir string, pub ed25519.PublicKey, expectedOS, expectedArch string) (Manifest, []byte, error) {
 	manifestBytes, err := os.ReadFile(filepath.Join(payloadDir, "manifest.json"))
 	if err != nil {
@@ -70,6 +116,9 @@ func LoadAndVerify(payloadDir string, pub ed25519.PublicKey, expectedOS, expecte
 	}
 	if m.OS != expectedOS || m.Architecture != expectedArch || filepath.Base(m.Filename) != m.Filename || m.Filename == "." {
 		return Manifest{}, nil, errors.New("manifest target rejected")
+	}
+	if m.Version == "" || m.MinimumLauncher == "" || m.MinimumProtocol <= 0 {
+		return Manifest{}, nil, errors.New("manifest compatibility metadata rejected")
 	}
 	payload, err := os.ReadFile(filepath.Join(payloadDir, m.Filename))
 	if err != nil {

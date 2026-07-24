@@ -44,19 +44,26 @@ from outside the operator network before continuing.
 ```sh
 export BRIDGE_RELEASE_KEY_FILE="$HOME/.config/openclaw-portable-bridge/release.key"
 export BRIDGE_RELEASE_PUBLIC_KEY='<public-key-printed-in-step-2>'
-./scripts/build-release.sh 0.5.0-mvp-dev
 cp packaging/usb/config/bridge-public.example.json \
    packaging/usb/config/bridge-public.json
 ```
 
 Edit `bridge-public.json` and set your public HTTPS broker URL and a non-secret
-USB identifier. Copy `packaging/usb/` to an `OPENCLAW_BRIDGE` directory on the
+USB identifier, then build:
+
+```sh
+./scripts/build-release.sh 0.5.2-mvp-dev
+```
+
+The build signs the public configuration, assembles every target in a clean
+staging directory, and verifies the complete checksum inventory before
+publishing it. Copy `packaging/usb/` to an `OPENCLAW_BRIDGE` directory on the
 portable drive.
 
 ## 5. Acceptance checks
 
 - Verify `SHA256SUMS.txt` after copying.
-- Confirm a modified manifest or payload is rejected.
+- Confirm a modified configuration, manifest, or payload is rejected.
 - Start with the Information profile and a short session.
 - Confirm revocation stops command delivery.
 - Confirm the launcher's temporary directory is removed after exit.

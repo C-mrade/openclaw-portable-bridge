@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.2-mvp-dev
+
+- Build releases in a clean staging directory and publish them only after every
+  target and checksum verifies, preventing mixed or partially updated USB
+  packages.
+- Sign the public USB configuration and reject endpoint or USB identifier
+  tampering before contacting the broker.
+- Embed the launcher version, sign the minimum compatible launcher version,
+  and reject mismatches between the launcher, manifest, and `VERSION.txt`.
+- Generate one portable checksum inventory for the complete package, including
+  documentation and configuration signatures.
+- Refuse release builds when the configured private and public signing keys do
+  not form the same Ed25519 key pair.
+- Return explicit protocol negotiation details when a client and broker use
+  incompatible wire versions.
+
 ## 0.5.1-mvp-dev
 
 - Give the staged client and every child process a stable bridge-owned working

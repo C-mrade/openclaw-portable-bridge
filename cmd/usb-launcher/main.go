@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"crypto/ed25519"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,10 +12,12 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"time"
 )
 
-var releasePublicKey string
+var (
+	releasePublicKey string
+	launcherVersion  = "0.0.0-dev"
+)
 
 type publicConfig struct {
 	USBID     string `json:"usbId"`
@@ -40,22 +43,27 @@ func run() error {
 	if e != nil {
 		return e
 	}
-	configBytes, e := os.ReadFile(filepath.Join(root, "config", "bridge-public.json"))
+	cfg, e := loadPublicConfig(root, pub)
 	if e != nil {
-		return fmt.Errorf("public configuration: %w", e)
-	}
-	var cfg publicConfig
-	if e = json.Unmarshal(configBytes, &cfg); e != nil || cfg.USBID == "" || (!strings.HasPrefix(cfg.BrokerURL, "https://") && !strings.HasPrefix(cfg.BrokerURL, "http://127.0.0.1:")) {
-		return errors.New("invalid public configuration or non-TLS broker URL")
+		return e
 	}
 	target := runtime.GOOS + "-" + runtime.GOARCH
 	m, payload, e := release.LoadAndVerify(filepath.Join(root, "payload", target), pub, runtime.GOOS, runtime.GOARCH)
 	if e != nil {
 		return e
 	}
-	session := fmt.Sprintf("%d-%d", time.Now().UTC().Unix(), os.Getpid())
-	stage := filepath.Join(os.TempDir(), "OpenClawBridge", session)
-	if e = os.MkdirAll(stage, 0700); e != nil {
+	if !release.VersionAtLeast(launcherVersion, m.MinimumLauncher) {
+		return fmt.Errorf("launcher %s is older than required version %s", launcherVersion, m.MinimumLauncher)
+	}
+	versionBytes, e := os.ReadFile(filepath.Join(root, "VERSION.txt"))
+	if e != nil {
+		return fmt.Errorf("release version file: %w", e)
+	}
+	if packagedVersion := strings.TrimSpace(string(versionBytes)); packagedVersion != m.Version {
+		return fmt.Errorf("mixed release rejected: package is %q but signed payload is %q", packagedVersion, m.Version)
+	}
+	stage, e := os.MkdirTemp("", "OpenClawBridge-")
+	if e != nil {
 		return e
 	}
 	defer func() {
@@ -124,6 +132,23 @@ func run() error {
 		return fmt.Errorf("client exited with an error: %w", e)
 	}
 	return nil
+}
+
+func loadPublicConfig(root string, pub ed25519.PublicKey) (publicConfig, error) {
+	configPath := filepath.Join(root, "config", "bridge-public.json")
+	configBytes, err := os.ReadFile(configPath)
+	if err != nil {
+		return publicConfig{}, fmt.Errorf("public configuration: %w", err)
+	}
+	signature, err := os.ReadFile(configPath + ".sig")
+	if err != nil || !release.Verify(pub, configBytes, string(signature)) {
+		return publicConfig{}, errors.New("public configuration signature verification failed")
+	}
+	var cfg publicConfig
+	if err = json.Unmarshal(configBytes, &cfg); err != nil || cfg.USBID == "" || (!strings.HasPrefix(cfg.BrokerURL, "https://") && !strings.HasPrefix(cfg.BrokerURL, "http://127.0.0.1:")) {
+		return publicConfig{}, errors.New("invalid public configuration or non-TLS broker URL")
+	}
+	return cfg, nil
 }
 
 func supportedTarget(goos, goarch string) bool {

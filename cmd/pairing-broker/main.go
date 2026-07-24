@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -70,7 +71,16 @@ func (s *server) pair(w http.ResponseWriter, r *http.Request) {
 	if !limitedJSON(w, r, &q) {
 		return
 	}
-	if q.Protocol != protocol.Version || q.USBID == "" || q.DurationSeconds < 60 || q.DurationSeconds > 3600 || !validCapabilities(q.Requested) || !auth.Verify(q.PublicKey, q.Signature, protocol.CanonicalPairRequest(q)) {
+	if q.Protocol != protocol.Version {
+		w.Header().Set("OpenClaw-Protocol-Version", fmt.Sprint(protocol.Version))
+		write(w, http.StatusUpgradeRequired, map[string]any{
+			"error":             "unsupported protocol version",
+			"receivedProtocol":  q.Protocol,
+			"supportedProtocol": protocol.Version,
+		})
+		return
+	}
+	if q.USBID == "" || q.DurationSeconds < 60 || q.DurationSeconds > 3600 || !validCapabilities(q.Requested) || !auth.Verify(q.PublicKey, q.Signature, protocol.CanonicalPairRequest(q)) {
 		write(w, 403, map[string]string{"error": "request rejected"})
 		return
 	}

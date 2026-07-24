@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -40,6 +41,20 @@ func TestCapabilityValidationRejectsUnknownDuplicateAndOversized(t *testing.T) {
 	}
 	if validCapabilities(tooMany) {
 		t.Fatal("oversized capability request accepted")
+	}
+}
+
+func TestPairRejectsUnsupportedProtocolWithNegotiationDetails(t *testing.T) {
+	s, _ := testServer(t)
+	w := requestJSON(t, s.pair, http.MethodPost, "/v1/pair/request", "", protocol.PairRequest{Protocol: protocol.Version + 1})
+	if w.Code != http.StatusUpgradeRequired {
+		t.Fatalf("unsupported protocol status: %d %s", w.Code, w.Body.String())
+	}
+	if got := w.Header().Get("OpenClaw-Protocol-Version"); got != fmt.Sprint(protocol.Version) {
+		t.Fatalf("supported protocol header = %q", got)
+	}
+	if !bytes.Contains(w.Body.Bytes(), []byte(`"supportedProtocol":2`)) {
+		t.Fatalf("missing negotiation details: %s", w.Body.String())
 	}
 }
 

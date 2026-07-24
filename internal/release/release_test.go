@@ -13,7 +13,7 @@ func TestSignedReleaseAndTamper(t *testing.T) {
 	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
 	d := t.TempDir()
 	payload := []byte("safe-client")
-	m := Manifest{Version: "1", OS: "windows", Architecture: "amd64", Filename: "bridge-client.exe", SHA256: Hash(payload), Size: int64(len(payload)), MinimumProtocol: 1}
+	m := Manifest{Version: "1", OS: "windows", Architecture: "amd64", Filename: "bridge-client.exe", SHA256: Hash(payload), Size: int64(len(payload)), MinimumLauncher: "1.0.0", MinimumProtocol: 1}
 	mb, _ := json.Marshal(m)
 	mustWrite(t, filepath.Join(d, "manifest.json"), mb)
 	mustWrite(t, filepath.Join(d, "manifest.json.sig"), []byte(Sign(priv, mb)))
@@ -30,6 +30,27 @@ func TestSignedReleaseAndTamper(t *testing.T) {
 		t.Fatal("tampered payload accepted")
 	}
 }
+
+func TestVersionAtLeast(t *testing.T) {
+	tests := []struct {
+		current string
+		minimum string
+		want    bool
+	}{
+		{"0.5.1-mvp-dev", "0.5.0", true},
+		{"v1.0.0", "1.0", true},
+		{"0.5.0", "0.5.1", false},
+		{"1.2", "1.2.1", false},
+		{"broken", "0.1.0", false},
+		{"1..0", "1.0.0", false},
+	}
+	for _, tt := range tests {
+		if got := VersionAtLeast(tt.current, tt.minimum); got != tt.want {
+			t.Errorf("VersionAtLeast(%q, %q) = %v, want %v", tt.current, tt.minimum, got, tt.want)
+		}
+	}
+}
+
 func mustWrite(t *testing.T, p string, b []byte) {
 	t.Helper()
 	if e := os.WriteFile(p, b, 0600); e != nil {
