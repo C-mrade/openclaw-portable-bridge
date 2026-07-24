@@ -21,17 +21,17 @@ securely, and never copy it to Git or USB.
 
 ## 2. Broker
 
-For the standard OpenClaw installation, copy `.env.example` to `.env`, set the
-administrator token and optional Telegram values, then run:
+For the standard agent installation, copy `.env.example` to `.env`, set the
+administrator token and broker URL, then run:
 
 ```sh
 ./scripts/setup-operator.sh
 ```
 
-This installs the broker, typed operator CLI, hardened user service, and
-bundled skill. Telegram approval requires both
-`BRIDGE_TELEGRAM_BOT_TOKEN` and numeric `BRIDGE_TELEGRAM_APPROVER_ID`. Use a
-dedicated bot; never reuse one already polled by OpenClaw or another process.
+This installs the broker, typed operator CLI, standalone MCP adapter, hardened
+user service, and bundled skill. Register `bridge-mcp` with the existing
+OpenClaw or Hermes instance so approval uses its existing private conversation.
+No dedicated Telegram bot is required.
 
 Build the broker and generate an independent administrator token:
 
@@ -106,8 +106,8 @@ it. Do not weaken mount security globally.
 ## Current approval interface
 
 The MVP exposes authenticated broker administration endpoints for an
-operator-side adapter. A polished approval CLI, Telegram buttons, and the
-official OpenClaw Node v4 adapter are not complete yet. Treat this repository
+operator-side adapter. Agent-native proactive notifications and automatic MCP
+registration are not complete yet. Treat this repository
 as a development MVP until those pieces and the remaining adversarial tests are
 finished.
 

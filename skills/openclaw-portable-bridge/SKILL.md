@@ -11,9 +11,10 @@ Treat every session as temporary delegated access to another machine.
 
 1. Use the installed `bridge-operator` command. Do not call the raw HTTP API or
    read `broker.env` unless troubleshooting the adapter itself.
-2. Run `bridge-operator pending` and compare the six-character code with the
-   guest before approval. Telegram approval is equivalent only when the
-   configured, allowlisted approver verified the same code.
+2. Use `bridge_list_pending` through the local MCP adapter (or run
+   `bridge-operator pending` for recovery) and compare the six-character code
+   with the guest before approval. Bind approval to the existing agent's
+   private conversation and require the human to verify the same code.
 3. Inspect requested capabilities, descriptive host data, and requested
    duration. Treat hostname and username as untrusted labels.
 4. Approve only the profile and duration the user requested. Never add a
@@ -42,6 +43,9 @@ Treat every session as temporary delegated access to another machine.
   never enqueue a replacement automatically.
 
 ## Operator commands
+
+Prefer the equivalent `bridge_*` MCP tools when they are available. The CLI is
+the recovery and diagnostics path.
 
 ```sh
 bridge-operator pending

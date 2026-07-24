@@ -12,7 +12,7 @@
 - Restart recovery requeues unacknowledged leases without replaying commands
   already acknowledged as running.
 - Corrupt or incompatible state fails closed.
-- Telegram callback approval accepts only the configured numeric approver.
+- MCP tool calls keep the administrator token inside the local adapter.
 - Authentic payload staged under `%TEMP%` and removed after exit.
 - Ephemeral Ed25519 pairing, comparison code, approval, expiry, and distinct
   pairing/session tokens.
@@ -38,7 +38,7 @@
 ## Deferred
 
 - Native Windows GUI/tray and per-command approval dialog.
-- Official OpenClaw Node v4 adapter and Telegram approval buttons.
+- OpenClaw/Hermes proactive approval notifications and auto-registration.
 - Authenticode signing.
 - Restrictive-network test matrix and HTTPS-port fallback.
 - Forced termination, USB removal, junction abuse, large-transfer, output

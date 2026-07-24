@@ -22,7 +22,8 @@ release criteria live in [Production vision](docs/PRODUCTION_VISION.md).
 
 - Native visible guest UI for activity, transfers, granular consent, pause,
   and revocation.
-- Typed operator CLI, scoped local adapter, and Telegram approval flow.
+- Agent-native approval notifications and automatic MCP registration for
+  OpenClaw and Hermes.
 - Complete persistent ConPTY transport with input, resize, acknowledgements,
   cancellation, and backpressure.
 - macOS `.app` packaging, Developer ID signing, and notarization.

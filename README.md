@@ -53,8 +53,7 @@ and native graphical interfaces remain future work.
 This is an MVP, not a production remote-management product. The current UI is
 a visible console. Native ConPTY primitives are present, but the persistent
 terminal protocol and UI are not complete. A native GUI, WebSocket streaming,
-Telegram approval buttons,
-the official OpenClaw Node v4 adapter, Authenticode signing, and the complete
+agent-native approval notifications, Authenticode signing, and the complete
 adversarial test matrix remain future work. Review
 [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) before exposing a broker publicly.
 The project's production invariants and release horizons are defined in the
@@ -76,12 +75,14 @@ For the standard OpenClaw operator installation:
 
 ```sh
 cp .env.example .env
-# Set BRIDGE_ADMIN_TOKEN and optionally a dedicated Telegram bot.
+# Set BRIDGE_ADMIN_TOKEN and the local broker URL.
 ./scripts/setup-operator.sh
 ```
 
-The setup builds or container-builds the broker and typed operator CLI,
-installs the user service, and installs the bundled OpenClaw skill. Guest
+The setup builds or container-builds the broker, typed operator CLI, and
+standalone MCP adapter, installs the user service, and installs the bundled
+agent skill. OpenClaw, Hermes, or another MCP-capable agent uses its existing
+private conversation for approval; no second Telegram bot is required. Guest
 machines still receive standalone signed binaries and require no Go, Python,
 Node.js, Docker, Git, OpenClaw, or administrator setup for portable sessions.
 
@@ -93,6 +94,7 @@ Go 1.24 or newer is recommended.
 go test ./...
 go build ./cmd/pairing-broker
 go build ./cmd/bridge-client
+go build ./cmd/bridge-mcp
 ```
 
 Create an Ed25519 release key outside the repository, then export its path and

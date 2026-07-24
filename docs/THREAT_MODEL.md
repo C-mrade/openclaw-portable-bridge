@@ -23,7 +23,8 @@ deployment proxy rather than the broker; delivery leases prevent execution
 without acknowledgement but running-command recovery after disconnect still
 needs durable state; reparse-point and time-of-check/time-of-use attacks need a
 larger adversarial Windows matrix; Authenticode, the official OpenClaw adapter,
-the native GUI, full ConPTY integration, and Telegram approval are incomplete.
+the native GUI, full ConPTY integration, and proactive agent approval
+notifications are incomplete.
 Operators must keep the broker on loopback, protect its admin token, expose it
 only through authenticated TLS infrastructure, and treat Developer sessions as
 equivalent to temporary remote control by the approved operator.

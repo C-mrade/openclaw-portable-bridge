@@ -58,7 +58,7 @@ requirement -> threat analysis -> implementation -> unit/race/fuzz tests
 ```
 
 Features that increase authority or hide operational ambiguity do not ship
-merely because the happy path works. A graphical UI, Telegram approval, and
+merely because the happy path works. A graphical UI, agent-native approval, and
 agent integrations are built only on top of durable recovery and an explicit
 trust model.
 
@@ -77,7 +77,7 @@ trust model.
 
 - native guest activity and consent UI;
 - granular profiles and per-action sensitive approval;
-- typed operator CLI and Telegram approval built on scoped credentials;
+- typed operator CLI and agent-native approval built on scoped credentials;
 - safe large-output artifacts and transfer progress.
 
 ### 0.8 — agent and terminal integration

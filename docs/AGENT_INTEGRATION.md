@@ -1,8 +1,9 @@
 # OpenClaw and Hermes agent integration
 
-The recommended integration is a server-side adapter that turns the loopback
-broker administration API into typed agent tools. The agent must never receive
-or persist the raw broker administrator token.
+The included `bridge-mcp` adapter turns the loopback broker administration API
+into typed agent tools. The agent never receives or persists the raw broker
+administrator token: the standalone adapter reads the protected operator
+configuration itself.
 
 ## Recommended tool surface
 
@@ -18,16 +19,38 @@ code and exact capability list, enforce maximum durations, validate typed
 command parameters, and redact credentials from every log. Keep destructive or
 elevated work subject to the agent platform's normal approval policy.
 
+The agent's existing Telegram, Discord, CLI, or web conversation is the
+approval surface. The Bridge does not own or poll a messaging bot. This avoids
+duplicate bots, `getUpdates` conflicts, and transport-specific credentials in
+the broker.
+
 The repository includes an agent skill at
 `skills/openclaw-portable-bridge/SKILL.md`. OpenClaw, Hermes, Codex, or another
 skill-compatible agent can install or reference that directory.
-`scripts/setup-operator.sh` installs both the skill and the typed
-`bridge-operator` CLI. The CLI reads its protected local environment, so the
-agent does not need the administrator token in its prompt or command line.
+`scripts/setup-operator.sh` installs the skill, the typed `bridge-operator`
+fallback CLI, and the dependency-free `bridge-mcp` executable. Both executables
+read the protected local environment.
 
-## Current transport
+## MCP registration
+
+Register the installed executable as a local stdio MCP server:
+
+```json
+{
+  "mcpServers": {
+    "openclaw_portable_bridge": {
+      "command": "/home/USER/.local/share/openclaw-portable-bridge/bridge-mcp"
+    }
+  }
+}
+```
+
+OpenClaw and Hermes may store MCP registration in different configuration
+files; their installer integration should write the platform-native entry
+rather than requiring a second messaging bot.
+
+## Fallback transport
 
 Pending listing, approval, rejection, commands, result consumption, and
-revocation are first-class broker operations. The current agent transport is
-the restricted typed CLI. A native MCP adapter should preserve the same tool
-surface and keep the token server-side; it must not become a generic HTTP proxy.
+revocation remain available through the restricted typed CLI for diagnostics.
+Neither MCP nor the CLI is a generic HTTP proxy.

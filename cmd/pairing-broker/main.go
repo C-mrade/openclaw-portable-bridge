@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/json"
@@ -37,18 +36,13 @@ type commandState struct {
 	LeaseUntil  time.Time
 }
 type server struct {
-	mu       sync.Mutex
-	p        map[string]*pending
-	audit    *audit.Logger
-	admin    string
-	seen     map[string]time.Time
-	rates    map[string][]time.Time
-	state    *stateStore
-	notifier approvalNotifier
-}
-
-type approvalNotifier interface {
-	PairRequested(string, protocol.PairRequest, protocol.PairReply)
+	mu    sync.Mutex
+	p     map[string]*pending
+	audit *audit.Logger
+	admin string
+	seen  map[string]time.Time
+	rates map[string][]time.Time
+	state *stateStore
 }
 
 func write(w http.ResponseWriter, status int, v any) {
@@ -112,9 +106,6 @@ func (s *server) pair(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Unlock()
 	s.audit.Event("pair_requested", map[string]any{"requestId": id, "usbId": q.USBID, "compareCode": rep.CompareCode, "source": r.RemoteAddr})
-	if s.notifier != nil {
-		s.notifier.PairRequested(id, q, rep)
-	}
 	write(w, 202, rep)
 }
 func (s *server) allowPair(remote, replay string) bool {
@@ -692,14 +683,6 @@ func main() {
 		log.Fatal(e)
 	}
 	s := &server{p: entries, audit: a, admin: admin, seen: map[string]time.Time{}, rates: map[string][]time.Time{}, state: store}
-	telegram, e := telegramFromEnvironment(s)
-	if e != nil {
-		log.Fatal(e)
-	}
-	if telegram != nil {
-		s.notifier = telegram
-		go telegram.Run(context.Background())
-	}
 	go s.janitor()
 	http.HandleFunc("/v1/pair/request", s.pair)
 	http.HandleFunc("/v1/pair/status", s.status)

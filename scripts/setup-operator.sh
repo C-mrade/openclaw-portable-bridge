@@ -25,8 +25,6 @@ read_env() {
 
 admin_token="$(read_env BRIDGE_ADMIN_TOKEN)"
 broker_url="$(read_env BRIDGE_BROKER_URL)"
-telegram_token="$(read_env BRIDGE_TELEGRAM_BOT_TOKEN)"
-telegram_approver="$(read_env BRIDGE_TELEGRAM_APPROVER_ID)"
 
 if [[ ${#admin_token} -lt 24 || ! "$admin_token" =~ ^[A-Za-z0-9._~-]+$ ]]; then
   printf 'BRIDGE_ADMIN_TOKEN must contain at least 24 safe URL characters\n' >&2
@@ -39,13 +37,6 @@ if [[ "$broker_url" != "http://127.0.0.1:17443" && "$broker_url" != https://* ]]
   printf 'BRIDGE_BROKER_URL must be loopback HTTP or HTTPS\n' >&2
   exit 2
 fi
-if [[ -n "$telegram_token" || -n "$telegram_approver" ]]; then
-  if [[ -z "$telegram_token" || ! "$telegram_approver" =~ ^[0-9]+$ ]]; then
-    printf 'Telegram token and numeric approver ID must be configured together\n' >&2
-    exit 2
-  fi
-fi
-
 mkdir -p "$config_dir" "$state_dir" "$install_dir" "$bin_dir" "$unit_dir" "$openclaw_workspace/skills"
 build_dir="$(mktemp -d)"
 trap 'rm -rf -- "$build_dir"' EXIT
@@ -53,15 +44,17 @@ trap 'rm -rf -- "$build_dir"' EXIT
 if command -v go >/dev/null 2>&1; then
   (
     cd "$project_dir"
-    CGO_ENABLED=0 go build -trimpath -o "$build_dir/pairing-broker" ./cmd/pairing-broker
-    CGO_ENABLED=0 go build -trimpath -o "$build_dir/bridge-operator" ./cmd/bridge-operator
+    CGO_ENABLED=0 go build -buildvcs=false -trimpath -o "$build_dir/pairing-broker" ./cmd/pairing-broker
+    CGO_ENABLED=0 go build -buildvcs=false -trimpath -o "$build_dir/bridge-operator" ./cmd/bridge-operator
+    CGO_ENABLED=0 go build -buildvcs=false -trimpath -o "$build_dir/bridge-mcp" ./cmd/bridge-mcp
   )
 elif command -v docker >/dev/null 2>&1; then
   docker run --rm --user "$(id -u):$(id -g)" \
     -e GOCACHE=/tmp/go-cache \
     -v "$project_dir:/src:ro" -v "$build_dir:/out" -w /src golang:1.24-bookworm \
     sh -c 'CGO_ENABLED=0 go build -buildvcs=false -trimpath -o /out/pairing-broker ./cmd/pairing-broker &&
-           CGO_ENABLED=0 go build -buildvcs=false -trimpath -o /out/bridge-operator ./cmd/bridge-operator'
+           CGO_ENABLED=0 go build -buildvcs=false -trimpath -o /out/bridge-operator ./cmd/bridge-operator &&
+           CGO_ENABLED=0 go build -buildvcs=false -trimpath -o /out/bridge-mcp ./cmd/bridge-mcp'
 else
   printf 'operator setup requires Go 1.24+ or Docker; guest machines require neither\n' >&2
   exit 2
@@ -69,15 +62,13 @@ fi
 
 install -m 0755 "$build_dir/pairing-broker" "$install_dir/pairing-broker"
 install -m 0755 "$build_dir/bridge-operator" "$install_dir/bridge-operator"
+install -m 0755 "$build_dir/bridge-mcp" "$install_dir/bridge-mcp"
 ln -sfn "$install_dir/bridge-operator" "$bin_dir/bridge-operator"
+ln -sfn "$install_dir/bridge-mcp" "$bin_dir/bridge-mcp"
 
 {
   printf 'BRIDGE_ADMIN_TOKEN=%s\n' "$admin_token"
   printf 'BRIDGE_BROKER_URL=%s\n' "$broker_url"
-  if [[ -n "$telegram_token" ]]; then
-    printf 'BRIDGE_TELEGRAM_BOT_TOKEN=%s\n' "$telegram_token"
-    printf 'BRIDGE_TELEGRAM_APPROVER_ID=%s\n' "$telegram_approver"
-  fi
 } > "$config_dir/broker.env"
 chmod 0600 "$config_dir/broker.env"
 
@@ -92,5 +83,6 @@ if [[ ${BRIDGE_SETUP_NO_START:-0} != 1 ]]; then
   systemctl --user --no-pager --full status openclaw-portable-bridge-broker.service
 fi
 
-printf '\nInstalled broker, bridge-operator, and OpenClaw skill.\n'
+printf '\nInstalled broker, bridge-operator, bridge-mcp, and agent skill.\n'
 printf 'Run: bridge-operator pending\n'
+printf 'Register MCP command: %s\n' "$install_dir/bridge-mcp"

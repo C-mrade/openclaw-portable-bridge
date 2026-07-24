@@ -6,19 +6,20 @@ The shortest supported operator path is:
 
 ```sh
 cp .env.example .env
-# Configure BRIDGE_ADMIN_TOKEN and optional dedicated Telegram approval values.
+# Configure BRIDGE_ADMIN_TOKEN and BRIDGE_BROKER_URL.
 ./scripts/setup-operator.sh
 bridge-operator pending
 ```
 
-The setup installs the broker, typed CLI, user service, and Bridge skill. It
+The setup installs the broker, typed CLI, standalone MCP adapter, user service,
+and Bridge skill. It
 uses an existing Go toolchain or Docker only on the operator machine. Portable
 guest machines have no dependency requirement.
 
-Telegram approval requires a dedicated bot token because two applications
-cannot safely consume `getUpdates` for the same bot. Set both
-`BRIDGE_TELEGRAM_BOT_TOKEN` and numeric `BRIDGE_TELEGRAM_APPROVER_ID`, or leave
-both empty and approve through `bridge-operator`.
+Register `bridge-mcp` with the existing OpenClaw or Hermes instance. Approval
+then appears through that agent's existing private conversation; the Bridge
+does not require or poll a separate Telegram bot. The typed
+`bridge-operator` CLI remains available for diagnostics and recovery.
 
 This guide produces a signed portable package and a loopback-only broker. The
 guest machine remains prerequisite-free. Commands assume Linux on the operator
@@ -91,4 +92,4 @@ portable drive.
 
 Next, read [Deployment](DEPLOYMENT.md), [Security operations](SECURITY.md), and
 the [Threat model](THREAT_MODEL.md). The typed operator CLI is included; a
-native MCP transport remains planned.
+the native stdio MCP adapter is included.

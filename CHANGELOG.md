@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.0-alpha.2
+
+- Replace the broker-owned Telegram bot with a standalone stdio MCP adapter
+  designed for the operator's existing OpenClaw, Hermes, or compatible agent.
+- Add six narrow Bridge tools for pending requests, approval, rejection,
+  commands, results, and revocation without exposing the administrator token.
+- Validate command capability names and bounded deadlines inside the adapter
+  before contacting the broker.
+- Install `bridge-mcp`, the fallback `bridge-operator` CLI, the broker, and the
+  shared agent skill through the same operator setup.
+- Remove Telegram credentials and polling from the broker and standard setup.
+
 ## 0.6.0-alpha.1
 
 - Persist broker sessions, queues, leases, command states, results, rejection,

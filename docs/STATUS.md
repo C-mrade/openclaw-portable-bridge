@@ -30,15 +30,15 @@ silent broker endpoint replacement.
 
 The current `0.6.0-alpha.1` work adds atomically persisted broker state,
 restart recovery that requeues only unacknowledged leases, explicit pending
-and reject APIs, a dedicated allowlisted Telegram approval bot, a typed local
-operator CLI, a reserved control-command lane, and one-command
+and reject APIs, a typed local operator CLI, a standalone MCP adapter for
+agent-native approval, a reserved control-command lane, and one-command
 operator/service/skill installation.
 
 The broker still stores session, command, lease, and result state in memory.
 The in-memory state is now durably mirrored and recovered, but a future schema
 migration layer is still required before the durable format is declared
 stable. Broker identity pinning, a dedicated updater, priority control traffic,
-native MCP transport, and real network-failure injection remain immediate
+platform-native MCP auto-registration, and real network-failure injection remain immediate
 `0.6` work; see `PRODUCTION_VISION.md`.
 
 A Windows x64 proof of concept has exercised pairing, `system.info`, process
@@ -50,6 +50,6 @@ macOS Intel, and macOS Apple Silicon are cross-compiled and manifest-verified,
 but still require representative hardware acceptance testing. Non-Windows
 Developer mode provides user-level shell, process, and file capabilities only.
 
-Outstanding work includes a native graphical UI, complete ConPTY streaming, an
-OpenClaw Node v4 adapter, Telegram approval flow, Authenticode signing, and the
+Outstanding work includes a native graphical UI, complete ConPTY streaming,
+OpenClaw/Hermes approval notifications, Authenticode signing, and the
 remaining network and Windows adversarial test cases listed in `TEST_REPORT.md`.
