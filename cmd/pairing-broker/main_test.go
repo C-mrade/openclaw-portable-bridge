@@ -110,6 +110,27 @@ func TestCommandIDsAreIdempotentAndConflictsAreRejected(t *testing.T) {
 	}
 }
 
+func TestControlCommandBypassesSaturatedRegularQueue(t *testing.T) {
+	s, token := testServer(t)
+	s.p["request"].Req.Requested = []string{"system.info", "shell.cancel"}
+	for i := range 16 {
+		command := protocol.Command{ID: fmt.Sprintf("regular-%d", i), Name: "system.info"}
+		w := requestJSON(t, s.enqueue, http.MethodPost, "/v1/admin/command", s.admin, map[string]any{"requestId": "request", "command": command})
+		if w.Code != http.StatusAccepted {
+			t.Fatalf("regular enqueue %d: %d %s", i, w.Code, w.Body.String())
+		}
+	}
+	cancel := protocol.Command{ID: "urgent-cancel", Name: "shell.cancel", Params: json.RawMessage(`{"jobId":"owned-job"}`)}
+	w := requestJSON(t, s.enqueue, http.MethodPost, "/v1/admin/command", s.admin, map[string]any{"requestId": "request", "command": cancel})
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("control command rejected: %d %s", w.Code, w.Body.String())
+	}
+	w = requestJSON(t, s.poll, http.MethodPost, "/v1/session/poll", token, nil)
+	if w.Code != http.StatusOK || !bytes.Contains(w.Body.Bytes(), []byte(`"ID":"urgent-cancel"`)) {
+		t.Fatalf("control command was not delivered first: %d %s", w.Code, w.Body.String())
+	}
+}
+
 func TestLeaseAckAndResultLifecycle(t *testing.T) {
 	s, token := testServer(t)
 	command := protocol.Command{ID: "lifecycle", Name: "system.info"}

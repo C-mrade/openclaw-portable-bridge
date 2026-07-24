@@ -9,6 +9,8 @@ the administrator token directly.
 Send `Authorization: Bearer <admin-token>` and JSON bodies.
 
 - `POST /v1/admin/approve`: `{"requestId":"…","minutes":20}`
+- `GET /v1/admin/pending`
+- `POST /v1/admin/reject`: `{"requestId":"…"}`
 - `POST /v1/admin/command`: `{"requestId":"…","command":{…}}`
 - `GET /v1/admin/results?id=<request-id>&consume=true`
 - `POST /v1/admin/revoke`: `{"requestId":"…"}`
@@ -47,7 +49,7 @@ redact tokens from logs, bind request IDs to the approving conversation, and
 make result consumption explicit. Do not expose a generic unauthenticated HTTP
 proxy to the model.
 
-The current MVP does not yet provide `list_pending` or `reject` as first-class
-broker endpoints; an adapter must derive pending requests from its trusted
-event stream, and rejection should be implemented explicitly before claiming a
-complete approval UX.
+The bundled `bridge-operator` CLI is the supported local adapter. A native MCP
+transport remains planned; until then, agents should invoke the typed CLI
+through their normal restricted execution policy rather than handling the
+administrator token or constructing arbitrary HTTP requests.

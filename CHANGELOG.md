@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.6.0-alpha.1
+
+- Persist broker sessions, queues, leases, command states, results, rejection,
+  and revocation using atomic private snapshots.
+- Recover expired leases as queued after restart while preserving acknowledged
+  running commands as uncertain and never replaying them automatically.
+- Add pending-request listing and explicit rejection APIs.
+- Add an optional dedicated Telegram approval bot with numeric approver
+  allowlisting and one-tap approve/reject callbacks.
+- Add a reserved priority lane for cancellation, owned-process stop, and
+  disconnect commands so control traffic bypasses saturated ordinary work.
+- Bound every approval to the duration originally requested by the guest.
+- Add the typed `bridge-operator` CLI so agents do not construct raw
+  administrator API calls or receive the administrator token as an argument.
+- Add `.env.example` and `setup-operator.sh` to install the broker, CLI,
+  systemd user service, and bundled OpenClaw skill in one operation.
+- Stop persisting the one-time pairing token in plaintext.
+
 ## 0.5.2-mvp-dev
 
 - Build releases in a clean staging directory and publish them only after every

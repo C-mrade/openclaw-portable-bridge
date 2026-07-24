@@ -9,10 +9,11 @@ Treat every session as temporary delegated access to another machine.
 
 ## Workflow
 
-1. Verify the broker is the operator-controlled local instance. Keep its admin
-   API on loopback or behind a trusted server-side adapter.
-2. Obtain the request ID and six-character comparison code from trusted local
-   output. Compare the code with the guest before approval.
+1. Use the installed `bridge-operator` command. Do not call the raw HTTP API or
+   read `broker.env` unless troubleshooting the adapter itself.
+2. Run `bridge-operator pending` and compare the six-character code with the
+   guest before approval. Telegram approval is equivalent only when the
+   configured, allowlisted approver verified the same code.
 3. Inspect requested capabilities, descriptive host data, and requested
    duration. Treat hostname and username as untrusted labels.
 4. Approve only the profile and duration the user requested. Never add a
@@ -36,6 +37,24 @@ Treat every session as temporary delegated access to another machine.
 - Preserve audit records and remove only Bridge-owned temporary files.
 - Do not treat a successful HTTP response as proof a command succeeded; inspect
   the returned command result and exit code.
+- Never approve a request whose duration exceeds what the guest expects.
+- Treat a recovered `running` command as uncertain until its result arrives;
+  never enqueue a replacement automatically.
+
+## Operator commands
+
+```sh
+bridge-operator pending
+bridge-operator approve REQUEST_ID MINUTES
+bridge-operator reject REQUEST_ID
+bridge-operator command --id UNIQUE_ID --name system.info REQUEST_ID
+bridge-operator results --consume REQUEST_ID
+bridge-operator revoke REQUEST_ID
+```
+
+Use a JSON `--params` value only for the documented typed capability. Keep
+timeouts short. The CLI reads its protected local configuration itself; never
+pass the administrator token on the command line.
 
 ## Platform selection
 

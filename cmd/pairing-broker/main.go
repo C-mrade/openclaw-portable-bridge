@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/json"
@@ -36,12 +37,18 @@ type commandState struct {
 	LeaseUntil  time.Time
 }
 type server struct {
-	mu    sync.Mutex
-	p     map[string]*pending
-	audit *audit.Logger
-	admin string
-	seen  map[string]time.Time
-	rates map[string][]time.Time
+	mu       sync.Mutex
+	p        map[string]*pending
+	audit    *audit.Logger
+	admin    string
+	seen     map[string]time.Time
+	rates    map[string][]time.Time
+	state    *stateStore
+	notifier approvalNotifier
+}
+
+type approvalNotifier interface {
+	PairRequested(string, protocol.PairRequest, protocol.PairReply)
 }
 
 func write(w http.ResponseWriter, status int, v any) {
@@ -92,10 +99,22 @@ func (s *server) pair(w http.ResponseWriter, r *http.Request) {
 	pairingToken, _ := auth.Token()
 	id = auth.Hash(id)[:24]
 	rep := protocol.PairReply{RequestID: id, Status: "pending", CompareCode: auth.CompareCode(q.PublicKey, q.Nonce), PairingToken: pairingToken}
+	storedReply := rep
+	storedReply.PairingToken = ""
 	s.mu.Lock()
-	s.p[id] = &pending{Req: q, Reply: rep, PairingTokenHash: auth.Hash(pairingToken), Commands: map[string]*commandState{}, CreatedAt: time.Now().UTC()}
+	s.p[id] = &pending{Req: q, Reply: storedReply, PairingTokenHash: auth.Hash(pairingToken), Commands: map[string]*commandState{}, CreatedAt: time.Now().UTC()}
+	if err := s.state.save(s.p); err != nil {
+		delete(s.p, id)
+		s.mu.Unlock()
+		log.Printf("persist pair request: %v", err)
+		write(w, 500, map[string]string{"error": "state unavailable"})
+		return
+	}
 	s.mu.Unlock()
 	s.audit.Event("pair_requested", map[string]any{"requestId": id, "usbId": q.USBID, "compareCode": rep.CompareCode, "source": r.RemoteAddr})
+	if s.notifier != nil {
+		s.notifier.PairRequested(id, q, rep)
+	}
 	write(w, 202, rep)
 }
 func (s *server) allowPair(remote, replay string) bool {
@@ -158,23 +177,74 @@ func (s *server) approve(w http.ResponseWriter, r *http.Request) {
 		write(w, 400, nil)
 		return
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	x := s.p[q.RequestID]
-	if x == nil || x.Reply.Status != "pending" {
-		write(w, 404, nil)
+	if err := s.approveRequest(q.RequestID, q.Minutes); err != nil {
+		write(w, err.status, map[string]string{"error": err.message})
 		return
 	}
+	s.audit.Event("pair_approved", map[string]any{"requestId": q.RequestID, "minutes": q.Minutes})
+	write(w, 200, map[string]string{"status": "approved"})
+}
+
+type requestError struct {
+	status  int
+	message string
+}
+
+func (e *requestError) Error() string { return e.message }
+
+func (s *server) approveRequest(requestID string, minutes int) *requestError {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	x := s.p[requestID]
+	if x == nil || x.Reply.Status != "pending" {
+		return &requestError{status: http.StatusNotFound, message: "pending request not found"}
+	}
+	maxMinutes := int((x.Req.DurationSeconds + 59) / 60)
+	if maxMinutes < 1 || maxMinutes > 60 || minutes < 1 || minutes > maxMinutes {
+		return &requestError{status: http.StatusBadRequest, message: "approval duration exceeds guest request"}
+	}
 	tok, _ := auth.Token()
+	previousReply := x.Reply
+	previousTokenHash := x.TokenHash
 	x.TokenHash = auth.Hash(tok)
 	x.Reply.Status = "approved"
 	x.Reply.SessionToken = tok
-	x.Reply.ExpiresAt = time.Now().UTC().Add(time.Duration(q.Minutes) * time.Minute)
+	x.Reply.ExpiresAt = time.Now().UTC().Add(time.Duration(minutes) * time.Minute)
 	initial := protocol.Command{ID: "initial-system-info", Name: "system.info", Deadline: time.Now().Add(15 * time.Second)}
+	previousInitial, hadInitial := x.Commands[initial.ID]
+	previousQueue := append([]string(nil), x.Queue...)
 	x.Commands[initial.ID] = newCommandState(initial)
 	x.Queue = append(x.Queue, initial.ID)
-	s.audit.Event("pair_approved", map[string]any{"requestId": q.RequestID, "minutes": q.Minutes})
-	write(w, 200, map[string]string{"status": "approved"})
+	if err := s.state.save(s.p); err != nil {
+		x.Reply = previousReply
+		x.TokenHash = previousTokenHash
+		x.Queue = previousQueue
+		if hadInitial {
+			x.Commands[initial.ID] = previousInitial
+		} else {
+			delete(x.Commands, initial.ID)
+		}
+		log.Printf("persist approval: %v", err)
+		return &requestError{status: http.StatusInternalServerError, message: "state unavailable"}
+	}
+	return nil
+}
+
+func (s *server) rejectRequest(requestID string) *requestError {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	x := s.p[requestID]
+	if x == nil || x.Reply.Status != "pending" {
+		return &requestError{status: http.StatusNotFound, message: "pending request not found"}
+	}
+	previousReply := x.Reply
+	x.Reply.Status = "rejected"
+	if err := s.state.save(s.p); err != nil {
+		x.Reply = previousReply
+		return &requestError{status: http.StatusInternalServerError, message: "state unavailable"}
+	}
+	s.audit.Event("pair_rejected", map[string]any{"requestId": requestID})
+	return nil
 }
 func (s *server) isAdmin(r *http.Request) bool {
 	return subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), []byte("Bearer "+s.admin)) == 1
@@ -225,19 +295,61 @@ func (s *server) enqueue(w http.ResponseWriter, r *http.Request) {
 		write(w, 409, map[string]any{"error": "command ID already used with different payload", "commandId": q.Command.ID})
 		return
 	}
-	if len(x.Queue) >= 16 {
+	regularDepth, controlDepth := queueDepths(x)
+	isControl := isControlCommand(q.Command.Name)
+	if (!isControl && regularDepth >= 16) || (isControl && controlDepth >= 4) {
 		depth := len(x.Queue)
+		limit := 16
+		if isControl {
+			limit = 4
+		}
 		s.mu.Unlock()
 		w.Header().Set("Retry-After", "1")
-		write(w, 409, map[string]any{"error": "queue full", "queueDepth": depth, "queueLimit": 16, "retryAfterSeconds": 1})
+		write(w, 409, map[string]any{"error": "queue full", "queueDepth": depth, "queueLimit": limit, "retryAfterSeconds": 1})
 		return
 	}
 	x.Commands[q.Command.ID] = state
-	x.Queue = append(x.Queue, q.Command.ID)
+	previousQueue := append([]string(nil), x.Queue...)
+	if isControl {
+		x.Queue = append([]string{q.Command.ID}, x.Queue...)
+	} else {
+		x.Queue = append(x.Queue, q.Command.ID)
+	}
 	depth := len(x.Queue)
+	if err := s.state.save(s.p); err != nil {
+		delete(x.Commands, q.Command.ID)
+		x.Queue = previousQueue
+		s.mu.Unlock()
+		log.Printf("persist command: %v", err)
+		write(w, 500, map[string]string{"error": "state unavailable"})
+		return
+	}
 	s.mu.Unlock()
 	s.audit.Event("command_queued", map[string]any{"requestId": q.RequestID, "commandId": q.Command.ID, "name": q.Command.Name})
-	write(w, 202, map[string]any{"status": "queued", "commandId": q.Command.ID, "queueDepth": depth, "queueLimit": 16})
+	limit := 16
+	if isControl {
+		limit = 4
+	}
+	write(w, 202, map[string]any{"status": "queued", "commandId": q.Command.ID, "queueDepth": depth, "queueLimit": limit})
+}
+
+func isControlCommand(name string) bool {
+	return name == "shell.cancel" || name == "process.stop-owned" || name == "session.disconnect"
+}
+
+func queueDepths(item *pending) (regular, control int) {
+	for _, id := range item.Queue {
+		state := item.Commands[id]
+		if state == nil || state.Status != "queued" {
+			continue
+		}
+		if isControlCommand(state.Command.Name) {
+			control++
+		} else {
+			regular++
+		}
+	}
+	return regular, control
 }
 
 func newCommandState(cmd protocol.Command) *commandState {
@@ -276,9 +388,67 @@ func (s *server) adminRevoke(w http.ResponseWriter, r *http.Request) {
 	x.Reply.Status = "revoked"
 	x.TokenHash = ""
 	x.Queue = nil
+	if err := s.state.save(s.p); err != nil {
+		s.mu.Unlock()
+		log.Printf("persist revocation: %v", err)
+		write(w, 500, map[string]string{"error": "state unavailable"})
+		return
+	}
 	s.mu.Unlock()
 	s.audit.Event("session_admin_revoked", map[string]any{"requestId": q.RequestID})
 	write(w, 200, map[string]string{"status": "revoked"})
+}
+
+func (s *server) adminPending(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdmin(r) {
+		write(w, 401, nil)
+		return
+	}
+	type pendingView struct {
+		RequestID       string    `json:"requestId"`
+		USBID           string    `json:"usbId"`
+		Hostname        string    `json:"hostname"`
+		OS              string    `json:"os"`
+		Arch            string    `json:"arch"`
+		User            string    `json:"user"`
+		Requested       []string  `json:"requested"`
+		DurationSeconds int64     `json:"durationSeconds"`
+		CompareCode     string    `json:"compareCode"`
+		CreatedAt       time.Time `json:"createdAt"`
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	items := make([]pendingView, 0)
+	for id, item := range s.p {
+		if item.Reply.Status == "pending" {
+			items = append(items, pendingView{
+				RequestID: id, USBID: item.Req.USBID, Hostname: item.Req.Hostname,
+				OS: item.Req.OS, Arch: item.Req.Arch, User: item.Req.User,
+				Requested:       append([]string(nil), item.Req.Requested...),
+				DurationSeconds: item.Req.DurationSeconds, CompareCode: item.Reply.CompareCode,
+				CreatedAt: item.CreatedAt,
+			})
+		}
+	}
+	write(w, 200, items)
+}
+
+func (s *server) adminReject(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdmin(r) {
+		write(w, 401, nil)
+		return
+	}
+	var q struct {
+		RequestID string `json:"requestId"`
+	}
+	if !limitedJSON(w, r, &q) {
+		return
+	}
+	if err := s.rejectRequest(q.RequestID); err != nil {
+		write(w, err.status, map[string]string{"error": err.message})
+		return
+	}
+	write(w, 200, map[string]string{"status": "rejected"})
 }
 func (s *server) adminResults(w http.ResponseWriter, r *http.Request) {
 	if !s.isAdmin(r) {
@@ -295,6 +465,11 @@ func (s *server) adminResults(w http.ResponseWriter, r *http.Request) {
 	results := append([]protocol.Result(nil), x.Results...)
 	if r.URL.Query().Get("consume") == "true" {
 		x.Results = nil
+		if err := s.state.save(s.p); err != nil {
+			log.Printf("persist consumed results: %v", err)
+			write(w, 500, map[string]string{"error": "state unavailable"})
+			return
+		}
 	}
 	write(w, 200, results)
 }
@@ -337,6 +512,12 @@ func (s *server) poll(w http.ResponseWriter, r *http.Request) {
 			state.Status = "leased"
 			state.LeaseUntil = time.Now().Add(10 * time.Second)
 			cmd := state.Command
+			if err := s.state.save(s.p); err != nil {
+				s.mu.Unlock()
+				log.Printf("persist command lease: %v", err)
+				write(w, 500, map[string]string{"error": "state unavailable"})
+				return
+			}
 			s.mu.Unlock()
 			write(w, 200, cmd)
 			return
@@ -379,6 +560,12 @@ func (s *server) ack(w http.ResponseWriter, r *http.Request) {
 	}
 	state.Status = "running"
 	state.LeaseUntil = time.Time{}
+	if err := s.state.save(s.p); err != nil {
+		s.mu.Unlock()
+		log.Printf("persist command acknowledgement: %v", err)
+		write(w, 500, map[string]string{"error": "state unavailable"})
+		return
+	}
 	s.mu.Unlock()
 	s.audit.Event("command_acknowledged", map[string]any{"commandId": q.CommandID})
 	write(w, 200, map[string]any{"status": "running", "commandId": q.CommandID})
@@ -407,6 +594,12 @@ func (s *server) result(w http.ResponseWriter, r *http.Request) {
 	state.Status = "completed"
 	if len(x.Results) < 128 {
 		x.Results = append(x.Results, q)
+	}
+	if err := s.state.save(s.p); err != nil {
+		s.mu.Unlock()
+		log.Printf("persist command result: %v", err)
+		write(w, 500, map[string]string{"error": "state unavailable"})
+		return
 	}
 	s.mu.Unlock()
 	s.audit.Event("command_result", map[string]any{"commandId": q.ID, "name": q.Name, "error": q.Error})
@@ -444,6 +637,12 @@ func (s *server) revoke(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	x.Reply.Status = "revoked"
 	x.TokenHash = ""
+	if err := s.state.save(s.p); err != nil {
+		s.mu.Unlock()
+		log.Printf("persist client revocation: %v", err)
+		write(w, 500, map[string]string{"error": "state unavailable"})
+		return
+	}
 	s.mu.Unlock()
 	s.audit.Event("session_revoked", map[string]any{})
 	write(w, 200, map[string]string{"status": "revoked"})
@@ -454,11 +653,18 @@ func (s *server) janitor() {
 	defer ticker.Stop()
 	for now := range ticker.C {
 		s.mu.Lock()
+		changed := false
 		for id, x := range s.p {
 			pendingExpired := x.Reply.Status == "pending" && now.Sub(x.CreatedAt) > 10*time.Minute
-			sessionGone := (x.Reply.Status == "revoked" || (!x.Reply.ExpiresAt.IsZero() && now.After(x.Reply.ExpiresAt))) && now.Sub(x.CreatedAt) > 10*time.Minute
+			sessionGone := (x.Reply.Status == "revoked" || x.Reply.Status == "rejected" || (!x.Reply.ExpiresAt.IsZero() && now.After(x.Reply.ExpiresAt))) && now.Sub(x.CreatedAt) > 10*time.Minute
 			if pendingExpired || sessionGone {
 				delete(s.p, id)
+				changed = true
+			}
+		}
+		if changed {
+			if err := s.state.save(s.p); err != nil {
+				log.Printf("persist janitor cleanup: %v", err)
 			}
 		}
 		s.mu.Unlock()
@@ -467,6 +673,7 @@ func (s *server) janitor() {
 func main() {
 	listen := flag.String("listen", "127.0.0.1:17443", "")
 	logPath := flag.String("audit", "broker-audit.jsonl", "")
+	statePath := flag.String("state", "broker-state.json", "")
 	flag.Parse()
 	admin := os.Getenv("BRIDGE_ADMIN_TOKEN")
 	if len(admin) < 24 {
@@ -477,11 +684,28 @@ func main() {
 		log.Fatal(e)
 	}
 	defer a.Close()
-	s := &server{p: map[string]*pending{}, audit: a, admin: admin, seen: map[string]time.Time{}, rates: map[string][]time.Time{}}
+	store, entries, e := openStateStore(*statePath, time.Now().UTC())
+	if e != nil {
+		log.Fatal(e)
+	}
+	if e := store.save(entries); e != nil {
+		log.Fatal(e)
+	}
+	s := &server{p: entries, audit: a, admin: admin, seen: map[string]time.Time{}, rates: map[string][]time.Time{}, state: store}
+	telegram, e := telegramFromEnvironment(s)
+	if e != nil {
+		log.Fatal(e)
+	}
+	if telegram != nil {
+		s.notifier = telegram
+		go telegram.Run(context.Background())
+	}
 	go s.janitor()
 	http.HandleFunc("/v1/pair/request", s.pair)
 	http.HandleFunc("/v1/pair/status", s.status)
 	http.HandleFunc("/v1/admin/approve", s.approve)
+	http.HandleFunc("/v1/admin/pending", s.adminPending)
+	http.HandleFunc("/v1/admin/reject", s.adminReject)
 	http.HandleFunc("/v1/admin/command", s.enqueue)
 	http.HandleFunc("/v1/admin/revoke", s.adminRevoke)
 	http.HandleFunc("/v1/admin/results", s.adminResults)

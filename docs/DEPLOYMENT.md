@@ -21,6 +21,18 @@ securely, and never copy it to Git or USB.
 
 ## 2. Broker
 
+For the standard OpenClaw installation, copy `.env.example` to `.env`, set the
+administrator token and optional Telegram values, then run:
+
+```sh
+./scripts/setup-operator.sh
+```
+
+This installs the broker, typed operator CLI, hardened user service, and
+bundled skill. Telegram approval requires both
+`BRIDGE_TELEGRAM_BOT_TOKEN` and numeric `BRIDGE_TELEGRAM_APPROVER_ID`. Use a
+dedicated bot; never reuse one already polled by OpenClaw or another process.
+
 Build the broker and generate an independent administrator token:
 
 ```sh
@@ -33,11 +45,15 @@ file and bind the broker to loopback:
 
 ```sh
 BRIDGE_ADMIN_TOKEN='<random-admin-token>' \
-  ./bin/pairing-broker -listen 127.0.0.1:17443 -audit ./broker-audit.jsonl
+  ./bin/pairing-broker -listen 127.0.0.1:17443 \
+    -audit ./broker-audit.jsonl -state ./broker-state.json
 ```
 
 An example hardened user service is available at
 `packaging/systemd/openclaw-portable-bridge-broker.service.example`.
+The private state snapshot is published atomically with mode `0600`. Back it up
+consistently with the audit log, never expose it through HTTPS, and treat a
+corrupt or unsupported state file as a fail-closed startup error.
 
 ## 3. HTTPS publication
 
@@ -60,7 +76,7 @@ Edit `bridge-public.json` with the public HTTPS broker URL and a non-secret USB
 identifier, then run:
 
 ```sh
-./scripts/build-release.sh 0.5.2-mvp-dev
+./scripts/build-release.sh 0.6.0-alpha.1
 ```
 
 The build signs that configuration and refuses to publish a partial release.

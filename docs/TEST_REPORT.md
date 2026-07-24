@@ -8,6 +8,11 @@
   rejected before network access.
 - Clean staged release assembly, complete checksum verification, and
   mixed-version package rejection.
+- Atomic broker-state snapshots with restrictive permissions.
+- Restart recovery requeues unacknowledged leases without replaying commands
+  already acknowledged as running.
+- Corrupt or incompatible state fails closed.
+- Telegram callback approval accepts only the configured numeric approver.
 - Authentic payload staged under `%TEMP%` and removed after exit.
 - Ephemeral Ed25519 pairing, comparison code, approval, expiry, and distinct
   pairing/session tokens.

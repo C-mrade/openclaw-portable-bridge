@@ -72,6 +72,19 @@ Start with the [operator quickstart](docs/QUICKSTART.md), then use the complete
 [Deployment](docs/DEPLOYMENT.md) guide for hardened or customized setups.
 For normal guest use, follow [Usage](docs/USAGE.md).
 
+For the standard OpenClaw operator installation:
+
+```sh
+cp .env.example .env
+# Set BRIDGE_ADMIN_TOKEN and optionally a dedicated Telegram bot.
+./scripts/setup-operator.sh
+```
+
+The setup builds or container-builds the broker and typed operator CLI,
+installs the user service, and installs the bundled OpenClaw skill. Guest
+machines still receive standalone signed binaries and require no Go, Python,
+Node.js, Docker, Git, OpenClaw, or administrator setup for portable sessions.
+
 ## Build and test
 
 Go 1.24 or newer is recommended.
@@ -89,7 +102,7 @@ public key before building the Windows package:
 go run ./cmd/release-tool -mode keygen -key /secure/path/release.key
 export BRIDGE_RELEASE_KEY_FILE=/secure/path/release.key
 export BRIDGE_RELEASE_PUBLIC_KEY='<public-key-printed-by-keygen>'
-./scripts/build-release.sh 0.5.0-mvp-dev
+./scripts/build-release.sh 0.6.0-alpha.1
 ```
 
 Copy `packaging/usb/config/bridge-public.example.json` to

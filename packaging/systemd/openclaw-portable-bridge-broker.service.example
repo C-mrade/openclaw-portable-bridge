@@ -5,7 +5,7 @@ After=network-online.target
 [Service]
 Type=simple
 EnvironmentFile=%h/.config/openclaw-portable-bridge/broker.env
-ExecStart=%h/.local/lib/openclaw-portable-bridge/pairing-broker -listen 127.0.0.1:17443 -audit %h/.local/state/openclaw-portable-bridge/audit.jsonl
+ExecStart=%h/.local/share/openclaw-portable-bridge/pairing-broker -listen 127.0.0.1:17443 -audit %h/.local/state/openclaw-portable-bridge/audit.jsonl -state %h/.local/state/openclaw-portable-bridge/broker-state.json
 Restart=on-failure
 NoNewPrivileges=true
 PrivateTmp=true
@@ -15,4 +15,3 @@ ReadWritePaths=%h/.local/state/openclaw-portable-bridge
 
 [Install]
 WantedBy=default.target
-

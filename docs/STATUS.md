@@ -28,11 +28,18 @@ after verification. The launcher now enforces signed version compatibility and
 a signed public USB configuration, preventing mixed-version packages and
 silent broker endpoint replacement.
 
+The current `0.6.0-alpha.1` work adds atomically persisted broker state,
+restart recovery that requeues only unacknowledged leases, explicit pending
+and reject APIs, a dedicated allowlisted Telegram approval bot, a typed local
+operator CLI, a reserved control-command lane, and one-command
+operator/service/skill installation.
+
 The broker still stores session, command, lease, and result state in memory.
-Restart recovery, broker identity pinning, a dedicated updater, priority
-control traffic, and real network-failure injection are the immediate `0.6`
-work. These gates intentionally precede the guest GUI, Telegram approval, and
-model-facing adapters; see `PRODUCTION_VISION.md`.
+The in-memory state is now durably mirrored and recovered, but a future schema
+migration layer is still required before the durable format is declared
+stable. Broker identity pinning, a dedicated updater, priority control traffic,
+native MCP transport, and real network-failure injection remain immediate
+`0.6` work; see `PRODUCTION_VISION.md`.
 
 A Windows x64 proof of concept has exercised pairing, `system.info`, process
 listing, a harmless user-level shell command, scoped file operations,

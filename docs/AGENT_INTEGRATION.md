@@ -20,13 +20,14 @@ elevated work subject to the agent platform's normal approval policy.
 
 The repository includes an agent skill at
 `skills/openclaw-portable-bridge/SKILL.md`. OpenClaw, Hermes, Codex, or another
-skill-compatible agent can install or reference that directory. The skill
-defines the safe operating workflow and links to an endpoint/parameter
-reference only when adapter work requires it.
+skill-compatible agent can install or reference that directory.
+`scripts/setup-operator.sh` installs both the skill and the typed
+`bridge-operator` CLI. The CLI reads its protected local environment, so the
+agent does not need the administrator token in its prompt or command line.
 
-## Current limitation
+## Current transport
 
-The broker MVP still lacks first-class pending-list and reject endpoints. Add
-those before presenting the adapter as a complete approval interface. Until
-then, derive pending notifications only from a trusted local event stream and
-use revocation/expiry conservatively.
+Pending listing, approval, rejection, commands, result consumption, and
+revocation are first-class broker operations. The current agent transport is
+the restricted typed CLI. A native MCP adapter should preserve the same tool
+surface and keep the token server-side; it must not become a generic HTTP proxy.
