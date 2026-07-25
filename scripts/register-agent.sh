@@ -60,10 +60,26 @@ register_hermes() {
     printf 'Hermes CLI not found\n' >&2
     return 1
   fi
+  local add_output test_output
   # First answer accepts replacement when the entry exists; the second
   # enables all six fixed Bridge tools after discovery.
-  printf 'y\ny\n' | hermes mcp add "$server_name" --command "$bridge_mcp"
-  hermes mcp test "$server_name" >/dev/null
+  if ! add_output="$(printf 'y\ny\n' | hermes mcp add "$server_name" --command "$bridge_mcp" 2>&1)"; then
+    printf '%s\n' "$add_output" >&2
+    return 1
+  fi
+  printf '%s\n' "$add_output"
+  if grep -Eqi 'failed to connect|requires the .mcp. Python SDK|saved .*disabled' <<<"$add_output"; then
+    printf 'Hermes did not enable the Bridge MCP server\n' >&2
+    return 1
+  fi
+  if ! test_output="$(hermes mcp test "$server_name" 2>&1)"; then
+    printf '%s\n' "$test_output" >&2
+    return 1
+  fi
+  if grep -Eqi 'connection failed|requires the .mcp. Python SDK' <<<"$test_output"; then
+    printf '%s\n' "$test_output" >&2
+    return 1
+  fi
   printf 'Registered and tested Bridge MCP in Hermes.\n'
 }
 

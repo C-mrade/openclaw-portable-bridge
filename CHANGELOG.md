@@ -4,6 +4,8 @@
 
 - Add automatic, probed MCP registration for OpenClaw and Hermes with
   selectable `auto`, `openclaw`, `hermes`, `both`, and `none` modes.
+- Fail Hermes registration closed when its MCP SDK is unavailable or the
+  platform saves the server disabled despite returning a successful exit code.
 - Replace the broker-owned Telegram bot with a standalone stdio MCP adapter
   designed for the operator's existing OpenClaw, Hermes, or compatible agent.
 - Add six narrow Bridge tools for pending requests, approval, rejection,
