@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.6.0-beta.1
+
 - Add an optional OpenClaw-native proactive approval notifier and user timer
   that deliver each pending request once through the existing private channel.
 - Add a native OpenClaw Telegram callback plugin that validates explicit

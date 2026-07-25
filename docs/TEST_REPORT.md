@@ -13,6 +13,15 @@
   already acknowledged as running.
 - Corrupt or incompatible state fails closed.
 - MCP tool calls keep the administrator token inside the local adapter.
+- OpenClaw proactive approval delivery through the existing private
+  conversation, with idempotent notification markers written only after
+  successful delivery.
+- OpenClaw Telegram callbacks handled before the agent queue with explicit
+  sender/chat allowlists, exact request/code matching, visible terminal state,
+  stale-button removal, and fail-closed tests for unauthorized, expired, and
+  mismatched callbacks.
+- Live Windows x64 approval on `STANPC` followed by an independently queued
+  and consumed `system.info` result.
 - Authentic payload staged under `%TEMP%` and removed after exit.
 - Ephemeral Ed25519 pairing, comparison code, approval, expiry, and distinct
   pairing/session tokens.
@@ -38,7 +47,10 @@
 ## Deferred
 
 - Native Windows GUI/tray and per-command approval dialog.
-- OpenClaw/Hermes proactive approval notifications and auto-registration.
+- Equivalent proactive approval/callback adapters for Hermes and agents other
+  than OpenClaw Telegram.
+- Full live approval matrix: reject, timeout, duplicate callback, broker
+  restart, revoke, and transport loss.
 - Authenticode signing.
 - Restrictive-network test matrix and HTTPS-port fallback.
 - Forced termination, USB removal, junction abuse, large-transfer, output

@@ -28,7 +28,7 @@ after verification. The launcher now enforces signed version compatibility and
 a signed public USB configuration, preventing mixed-version packages and
 silent broker endpoint replacement.
 
-The current `0.6.0-alpha.2` work adds atomically persisted broker state,
+The current `0.6.0-beta.1` work adds atomically persisted broker state,
 restart recovery that requeues only unacknowledged leases, explicit pending
 and reject APIs, a typed local operator CLI, a standalone MCP adapter for
 agent-native approval, a reserved control-command lane, and one-command
@@ -40,9 +40,10 @@ a future schema
 migration layer is still required before the durable format is declared
 stable. OpenClaw now has proactive private-conversation notification and a
 direct Telegram callback plugin that validates explicit sender/chat allowlists
-before the agent queue. Broker identity pinning, a dedicated updater, broader
-conversation adapters, and real network-failure injection remain immediate
-work; see `PRODUCTION_VISION.md`.
+before the agent queue, binds the callback to the pending request and
+comparison code, and resolves the original message in place. Broker identity
+pinning, a dedicated updater, broader conversation adapters, and real
+network-failure injection remain immediate work; see `PRODUCTION_VISION.md`.
 
 A Windows x64 proof of concept has exercised pairing, `system.info`, process
 listing, a harmless user-level shell command, scoped file operations,

@@ -53,8 +53,8 @@ and native graphical interfaces remain future work.
 This is an MVP, not a production remote-management product. The current UI is
 a visible console. Native ConPTY primitives are present, but the persistent
 terminal protocol and UI are not complete. A native GUI, WebSocket streaming,
-agent-native approval notifications, Authenticode signing, and the complete
-adversarial test matrix remain future work. Review
+equivalent approval adapters outside OpenClaw Telegram, Authenticode signing,
+and the complete adversarial test matrix remain future work. Review
 [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) before exposing a broker publicly.
 The project's production invariants and release horizons are defined in the
 [Production vision](docs/PRODUCTION_VISION.md).
@@ -105,7 +105,7 @@ public key before building the Windows package:
 go run ./cmd/release-tool -mode keygen -key /secure/path/release.key
 export BRIDGE_RELEASE_KEY_FILE=/secure/path/release.key
 export BRIDGE_RELEASE_PUBLIC_KEY='<public-key-printed-by-keygen>'
-./scripts/build-release.sh 0.6.0-alpha.1
+./scripts/build-release.sh 0.6.0-beta.1
 ```
 
 Copy `packaging/usb/config/bridge-public.example.json` to

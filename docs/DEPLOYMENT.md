@@ -90,7 +90,7 @@ Edit `bridge-public.json` with the public HTTPS broker URL and a non-secret USB
 identifier, then run:
 
 ```sh
-./scripts/build-release.sh 0.6.0-alpha.1
+./scripts/build-release.sh 0.6.0-beta.1
 ```
 
 The build signs that configuration and refuses to publish a partial release.
