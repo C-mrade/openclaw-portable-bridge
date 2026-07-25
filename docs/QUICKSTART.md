@@ -1,6 +1,39 @@
 # Operator quickstart
 
-## Automated OpenClaw setup
+## Guided setup
+
+The shortest safe path from a fresh clone is:
+
+```sh
+git clone https://github.com/C-mrade/openclaw-portable-bridge.git
+cd openclaw-portable-bridge
+./scripts/install.sh
+```
+
+The wizard validates prerequisites, generates the administrator token and
+deployment-specific Ed25519 trust root, configures OpenClaw or Hermes, builds
+the signed multi-platform package, verifies every checksum, and runs
+`bridge-doctor`. To prepare a mounted USB in the same run:
+
+```sh
+./scripts/install.sh --usb-dir /media/USER/USB
+```
+
+For automation, all required choices can be supplied explicitly:
+
+```sh
+./scripts/install.sh --non-interactive \
+  --public-url https://bridge.example.com \
+  --agent openclaw \
+  --approval-target 123456789 \
+  --approver-ids 123456789
+```
+
+The public HTTPS endpoint must already route to the loopback broker through a
+hardened reverse proxy or tunnel. The installer deliberately does not bind the
+broker publicly or create a third-party relay account.
+
+## Existing configuration path
 
 The shortest supported operator path is:
 
@@ -22,8 +55,9 @@ does not require or poll a separate Telegram bot. The typed
 `bridge-operator` CLI remains available for diagnostics and recovery.
 
 This guide produces a signed portable package and a loopback-only broker. The
-guest machine remains prerequisite-free. Commands assume Linux on the operator
-host, Go 1.24+, Docker, OpenSSL, and an HTTPS publishing method.
+guest machine remains prerequisite-free. The guided installer requires Linux,
+OpenSSL, jq, curl, and Docker on the operator host. Go is optional because the
+installer can use the pinned Go container for builds.
 
 ## 1. Clone and verify
 

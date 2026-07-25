@@ -8,6 +8,34 @@ permissions:
   contents: read
 
 jobs:
+  installer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: bash -n scripts/*.sh
+      - run: ./scripts/install.sh --help
+      - run: |
+          if ./scripts/install.sh --non-interactive --public-url http://insecure.example; then
+            echo "installer accepted an insecure public URL" >&2
+            exit 1
+          fi
+      - run: |
+          export HOME="$RUNNER_TEMP/bridge-home"
+          export XDG_CONFIG_HOME="$HOME/.config"
+          export XDG_STATE_HOME="$HOME/.local/state"
+          export XDG_DATA_HOME="$HOME/.local/share"
+          export BRIDGE_SETUP_NO_START=1
+          export BRIDGE_SETUP_NO_REGISTER=1
+          export BRIDGE_INSTALL_SKIP_DOCTOR=1
+          mkdir -p "$HOME"
+          ./scripts/install.sh --non-interactive \
+            --public-url https://bridge.example.com \
+            --agent none
+          test -x "$HOME/.local/bin/bridge-operator"
+          test -s "$HOME/.config/openclaw-portable-bridge/signing/release.key"
+          test -s packaging/usb/SHA256SUMS.txt
+          (cd packaging/usb && sha256sum -c SHA256SUMS.txt)
+
   test:
     runs-on: ubuntu-latest
     steps:

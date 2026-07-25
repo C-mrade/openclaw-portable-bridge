@@ -29,6 +29,14 @@ approval_target="$(read_env BRIDGE_APPROVAL_TARGET)"
 approver_ids="$(read_env BRIDGE_APPROVER_IDS)"
 gateway_env_file="$(read_env BRIDGE_GATEWAY_ENV_FILE)"
 
+if [[ -z "$admin_token" ]]; then
+  if ! command -v openssl >/dev/null 2>&1; then
+    printf 'BRIDGE_ADMIN_TOKEN is empty and openssl is unavailable for safe generation\n' >&2
+    exit 2
+  fi
+  admin_token="$(openssl rand -hex 32)"
+  printf 'Generated a new broker administrator token.\n'
+fi
 if [[ ${#admin_token} -lt 24 || ! "$admin_token" =~ ^[A-Za-z0-9._~-]+$ ]]; then
   printf 'BRIDGE_ADMIN_TOKEN must contain at least 24 safe URL characters\n' >&2
   exit 2

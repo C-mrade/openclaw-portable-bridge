@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add a guided `install.sh` path that generates per-deployment credentials and
+  signing keys, configures the operator integration, builds a signed release,
+  optionally prepares USB media, and runs post-install diagnostics.
+- Add `bridge-doctor.sh`, atomic verified USB preparation, and an optional
+  encrypted release-key backup helper.
+- Allow the lower-level operator setup to generate a secure administrator
+  token when one is not supplied.
 - Load release signing material from a canonical operator configuration
   directory by default, while retaining explicit environment overrides for CI
   and external signers.

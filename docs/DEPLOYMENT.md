@@ -10,6 +10,11 @@ The build/server machine needs Go 1.24 or Docker, an HTTPS publishing method,
 and a safe location for an Ed25519 release key. None of these are required on
 the Windows guest.
 
+Most operators should use `./scripts/install.sh`. It generates deployment
+secrets, invokes the hardened setup, builds the signed package, and runs
+`bridge-doctor`. The manual sections below remain the authoritative path for
+custom infrastructure and recovery.
+
 Generate the release key outside the checkout. The standard persistent
 locations are documented in [Release signing operations](RELEASE_SIGNING.md):
 
@@ -100,6 +105,13 @@ drive.
 
 Before distribution, verify `SHA256SUMS.txt` and test that modifying the public
 configuration, manifest, or payload causes the launcher to refuse execution.
+
+To copy an already-built package to a mounted drive with staging, rollback, and
+verification:
+
+```sh
+./scripts/prepare-usb.sh /media/USER/USB
+```
 
 ## 5. Guest operation
 

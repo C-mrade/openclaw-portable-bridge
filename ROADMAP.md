@@ -7,6 +7,13 @@ upgrade path are complete. The long-term gates live in
 
 ## M1 — agent-native operator path (`0.6`)
 
+- Provide one guided installer that creates deployment secrets, configures the
+  agent integration, builds the signed package, prepares USB media, and runs
+  actionable diagnostics.
+- Support a fully explicit non-interactive setup path for automation and clean
+  CI acceptance.
+- Keep HTTPS publication an explicit operator choice; never trade onboarding
+  convenience for direct broker exposure or shared trust roots.
 - Automatically register and probe the local MCP adapter in OpenClaw or Hermes.
 - Deliver pending-pairing events into an existing private agent conversation
   without owning a Telegram bot or exposing the administrator token.
@@ -15,8 +22,9 @@ upgrade path are complete. The long-term gates live in
 - Add end-to-end tests for approve, reject, timeout, revoke, restart, and
   duplicate delivery.
 
-Exit gate: a fresh operator can configure environment variables, run one setup
-command, and approve a real USB guest from their existing agent conversation.
+Exit gate: a fresh operator can run one guided command, provide their HTTPS
+endpoint and optional private approval IDs, prepare a verified USB, and approve
+a real guest from their existing agent conversation.
 
 ## M2 — trustworthy guest experience (`0.7`)
 

@@ -67,11 +67,26 @@ There are two distinct environments:
    and publishes only that broker through HTTPS.
 2. **Windows guest:** runs the finished USB package with no prerequisites.
 
-Start with the [operator quickstart](docs/QUICKSTART.md), then use the complete
-[Deployment](docs/DEPLOYMENT.md) guide for hardened or customized setups.
-For normal guest use, follow [Usage](docs/USAGE.md).
+For the guided path, clone the repository and run:
 
-For the standard OpenClaw operator installation:
+```sh
+./scripts/install.sh
+```
+
+The installer creates the operator token and persistent release trust root,
+configures the local agent integration, builds and verifies the signed portable
+package, and runs diagnostics. Pass `--usb-dir /media/USER/DRIVE` to prepare a
+mounted USB atomically. It does not weaken the architecture by exposing the
+broker directly: the operator must supply an existing public HTTPS URL backed
+by a hardened reverse proxy or tunnel. The guided multi-platform build
+currently requires Docker on the Linux operator; guest machines require
+nothing.
+
+Start with the [operator quickstart](docs/QUICKSTART.md), then use the complete
+[Deployment](docs/DEPLOYMENT.md) guide for hardened or customized setups. For
+normal guest use, follow [Usage](docs/USAGE.md).
+
+For unattended or already-configured operator installation:
 
 ```sh
 cp .env.example .env
