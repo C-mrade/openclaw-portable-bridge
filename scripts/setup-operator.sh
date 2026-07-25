@@ -25,6 +25,9 @@ read_env() {
 
 admin_token="$(read_env BRIDGE_ADMIN_TOKEN)"
 broker_url="$(read_env BRIDGE_BROKER_URL)"
+approval_target="$(read_env BRIDGE_APPROVAL_TARGET)"
+approver_ids="$(read_env BRIDGE_APPROVER_IDS)"
+gateway_env_file="$(read_env BRIDGE_GATEWAY_ENV_FILE)"
 
 if [[ ${#admin_token} -lt 24 || ! "$admin_token" =~ ^[A-Za-z0-9._~-]+$ ]]; then
   printf 'BRIDGE_ADMIN_TOKEN must contain at least 24 safe URL characters\n' >&2
@@ -63,6 +66,8 @@ fi
 install -m 0755 "$build_dir/pairing-broker" "$install_dir/pairing-broker"
 install -m 0755 "$build_dir/bridge-operator" "$install_dir/bridge-operator"
 install -m 0755 "$build_dir/bridge-mcp" "$install_dir/bridge-mcp"
+install -m 0755 "$project_dir/scripts/openclaw-approval-notifier.sh" \
+  "$install_dir/openclaw-approval-notifier"
 ln -sfn "$install_dir/bridge-operator" "$bin_dir/bridge-operator"
 ln -sfn "$install_dir/bridge-mcp" "$bin_dir/bridge-mcp"
 
@@ -86,6 +91,52 @@ fi
 if [[ ${BRIDGE_SETUP_NO_REGISTER:-0} != 1 ]]; then
   "$project_dir/scripts/register-agent.sh" \
     "${BRIDGE_AGENT_TARGET:-auto}" "$install_dir/bridge-mcp"
+fi
+
+if [[ -n "$approval_target" || -n "$approver_ids" ]]; then
+  if [[ ! "$approval_target" =~ ^[0-9]+$ ]]; then
+    printf 'BRIDGE_APPROVAL_TARGET must be a numeric private Telegram chat ID\n' >&2
+    exit 2
+  fi
+  if [[ ! "$approver_ids" =~ ^[0-9]+(,[0-9]+)*$ ]]; then
+    printf 'BRIDGE_APPROVER_IDS must contain comma-separated numeric Telegram sender IDs\n' >&2
+    exit 2
+  fi
+  if [[ -z "$gateway_env_file" ]]; then
+    gateway_env_file="$HOME/.openclaw/openclaw.env"
+  fi
+  if [[ ! "$gateway_env_file" =~ ^[A-Za-z0-9_./-]+$ ]]; then
+    printf 'BRIDGE_GATEWAY_ENV_FILE contains unsupported characters\n' >&2
+    exit 2
+  fi
+
+  approver_json="$(jq -cn --arg ids "$approver_ids" '$ids | split(",")')"
+  plugin_config="$(jq -cn \
+    --argjson approvers "$approver_json" \
+    --arg conversation "$approval_target" \
+    --arg operator "$bin_dir/bridge-operator" \
+    '{allowedApproverIds:$approvers,allowedConversationIds:[$conversation],operatorPath:$operator}')"
+
+  openclaw plugins install --force \
+    "$project_dir/integrations/openclaw-approval-plugin"
+  openclaw config set 'plugins.entries["portable-bridge-approval"].config' \
+    "$plugin_config" --strict-json
+
+  sed \
+    -e "s|TELEGRAM_CHAT_ID|$approval_target|" \
+    -e "s|OPENCLAW_GATEWAY_ENV_FILE|$gateway_env_file|" \
+    "$project_dir/packaging/systemd/openclaw-portable-bridge-notifier.service.example" \
+    > "$unit_dir/openclaw-portable-bridge-notifier.service"
+  install -m 0644 \
+    "$project_dir/packaging/systemd/openclaw-portable-bridge-notifier.timer.example" \
+    "$unit_dir/openclaw-portable-bridge-notifier.timer"
+
+  if [[ ${BRIDGE_SETUP_NO_START:-0} != 1 ]]; then
+    systemctl --user daemon-reload
+    systemctl --user enable --now openclaw-portable-bridge-notifier.timer
+  fi
+  printf 'Installed proactive approval notifier and direct callback plugin.\n'
+  printf 'Restart the OpenClaw Gateway after setup to activate the callback plugin.\n'
 fi
 
 printf '\nInstalled broker, bridge-operator, bridge-mcp, and agent skill.\n'

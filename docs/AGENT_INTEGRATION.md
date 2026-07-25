@@ -40,6 +40,14 @@ surface, sends through OpenClaw's existing channel, and records a local marker
 only after successful delivery. The broker still owns request validity and
 expiry; the notifier owns neither credentials nor approval state.
 
+The companion `portable-bridge-approval` OpenClaw plugin claims the `bridge:`
+Telegram callback namespace before callbacks enter the agent/LLM queue. It
+requires OpenClaw sender authorization plus explicit sender and private-chat
+allowlists, re-reads the authoritative pending request, verifies request ID,
+comparison code, and guest duration, and then invokes only the typed operator
+CLI. Terminal outcomes edit the original message and clear every button.
+Transient failures leave the buttons available for retry.
+
 The repository includes an agent skill at
 `skills/openclaw-portable-bridge/SKILL.md`. OpenClaw, Hermes, Codex, or another
 skill-compatible agent can install or reference that directory.
@@ -75,6 +83,10 @@ installation. The equivalent local stdio entry is:
 The installer uses each platform's native CLI and probes all six tools before
 reporting success. It stores only the executable path in agent configuration;
 the administrator token remains in the protected Bridge operator environment.
+When `BRIDGE_APPROVAL_TARGET` and `BRIDGE_APPROVER_IDS` are configured, setup
+also installs the proactive notifier, user timer, and direct callback plugin.
+Restart the OpenClaw Gateway once after setup to activate a newly installed
+plugin.
 
 ## Fallback transport
 

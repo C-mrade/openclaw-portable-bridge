@@ -4,6 +4,9 @@
 
 - Add an optional OpenClaw-native proactive approval notifier and user timer
   that deliver each pending request once through the existing private channel.
+- Add a native OpenClaw Telegram callback plugin that validates explicit
+  sender/chat allowlists and resolves approve/reject actions before the agent
+  queue while editing the original message in place.
 - Return authoritative request, duration, and expiry data after approval so
   agent adapters can render resolved approval state.
 - Require approval surfaces to edit the original prompt, remove stale buttons,

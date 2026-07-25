@@ -19,6 +19,11 @@ jobs:
       - run: go test ./...
       - run: go test -race ./...
       - run: go vet ./...
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: false
+      - run: node --test integrations/openclaw-approval-plugin/src/index.test.js
 
   cross-build:
     runs-on: ubuntu-latest

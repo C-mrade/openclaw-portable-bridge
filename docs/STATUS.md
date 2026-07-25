@@ -35,13 +35,14 @@ agent-native approval, a reserved control-command lane, and one-command
 operator/service/skill installation with automatic OpenClaw/Hermes MCP
 registration and probing.
 
-The broker still stores session, command, lease, and result state in memory.
-The in-memory state is now durably mirrored and recovered, but a future schema
+The broker keeps a live in-memory model that is durably mirrored and recovered;
+a future schema
 migration layer is still required before the durable format is declared
-stable. Broker identity pinning, a dedicated updater, proactive private
-conversation notification, conversation-bound approvals, and real
-network-failure injection remain immediate `0.6` work; see
-`PRODUCTION_VISION.md`.
+stable. OpenClaw now has proactive private-conversation notification and a
+direct Telegram callback plugin that validates explicit sender/chat allowlists
+before the agent queue. Broker identity pinning, a dedicated updater, broader
+conversation adapters, and real network-failure injection remain immediate
+work; see `PRODUCTION_VISION.md`.
 
 A Windows x64 proof of concept has exercised pairing, `system.info`, process
 listing, a harmless user-level shell command, scoped file operations,
@@ -53,5 +54,6 @@ but still require representative hardware acceptance testing. Non-Windows
 Developer mode provides user-level shell, process, and file capabilities only.
 
 Outstanding work includes a native graphical UI, complete ConPTY streaming,
-OpenClaw/Hermes approval notifications, Authenticode signing, and the
-remaining network and Windows adversarial test cases listed in `TEST_REPORT.md`.
+equivalent direct approval handlers outside OpenClaw Telegram, Authenticode
+signing, and the remaining network and Windows adversarial test cases listed in
+`TEST_REPORT.md`.

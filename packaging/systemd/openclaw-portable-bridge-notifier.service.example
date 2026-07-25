@@ -5,7 +5,7 @@ After=openclaw-portable-bridge-broker.service
 [Service]
 Type=oneshot
 Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
-Environment=BRIDGE_GATEWAY_ENV_FILE=%h/.openclaw/openclaw.env
+Environment=BRIDGE_GATEWAY_ENV_FILE=OPENCLAW_GATEWAY_ENV_FILE
 Environment=BRIDGE_APPROVAL_CHANNEL=telegram
 Environment=BRIDGE_APPROVAL_TARGET=TELEGRAM_CHAT_ID
 ExecStart=%h/.local/share/openclaw-portable-bridge/openclaw-approval-notifier

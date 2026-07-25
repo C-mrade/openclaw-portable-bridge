@@ -1,0 +1,50 @@
+{
+  "id": "portable-bridge-approval",
+  "name": "Portable Bridge Approval",
+  "description": "Handle Portable Bridge Telegram approvals outside the agent queue.",
+  "version": "0.6.0-beta.1",
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "allowedApproverIds": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allowedConversationIds": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "operatorPath": {
+        "type": "string",
+        "minLength": 1,
+        "default": "bridge-operator"
+      }
+    }
+  },
+  "uiHints": {
+    "allowedApproverIds": {
+      "label": "Allowed Telegram approvers",
+      "help": "Numeric Telegram sender IDs allowed to resolve Bridge approvals."
+    },
+    "allowedConversationIds": {
+      "label": "Allowed Telegram conversations",
+      "help": "Private Telegram chat IDs where Bridge approvals may be resolved."
+    },
+    "operatorPath": {
+      "label": "Bridge operator path",
+      "help": "Absolute path to the protected bridge-operator executable."
+    }
+  }
+}

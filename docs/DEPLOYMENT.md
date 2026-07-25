@@ -33,6 +33,20 @@ user service, and bundled skill. Register `bridge-mcp` with the existing
 OpenClaw or Hermes instance so approval uses its existing private conversation.
 No dedicated Telegram bot is required.
 
+For OpenClaw-native proactive Telegram approval, also configure the numeric
+private chat and approver IDs:
+
+```sh
+BRIDGE_APPROVAL_TARGET=123456789
+BRIDGE_APPROVER_IDS=123456789
+BRIDGE_GATEWAY_ENV_FILE=/home/USER/.openclaw/openclaw.env
+```
+
+The setup then installs a 10-second notifier timer and a callback plugin. The
+plugin resolves approve/reject callbacks before the agent queue, binds them to
+the configured private conversation, and edits the original message in place.
+Restart the OpenClaw Gateway once after installation.
+
 Build the broker and generate an independent administrator token:
 
 ```sh
@@ -105,11 +119,12 @@ it. Do not weaken mount security globally.
 
 ## Current approval interface
 
-The MVP exposes authenticated broker administration endpoints for an
-operator-side adapter. Agent-native proactive notifications and automatic MCP
-registration are not complete yet. Treat this repository
-as a development MVP until those pieces and the remaining adversarial tests are
-finished.
+The current development release includes automatic MCP registration, proactive
+OpenClaw Telegram notifications, and a direct callback handler with explicit
+sender/chat binding. Hermes and other agents retain the typed MCP/CLI path but
+do not yet have the OpenClaw-specific direct Telegram handler. Treat this
+repository as a development release until the remaining adversarial tests and
+platform-signing gates are complete.
 
 For a short, end-to-end path with validation checkpoints, use
 [QUICKSTART.md](QUICKSTART.md) first.
