@@ -28,18 +28,20 @@ after verification. The launcher now enforces signed version compatibility and
 a signed public USB configuration, preventing mixed-version packages and
 silent broker endpoint replacement.
 
-The current `0.6.0-alpha.1` work adds atomically persisted broker state,
+The current `0.6.0-alpha.2` work adds atomically persisted broker state,
 restart recovery that requeues only unacknowledged leases, explicit pending
 and reject APIs, a typed local operator CLI, a standalone MCP adapter for
 agent-native approval, a reserved control-command lane, and one-command
-operator/service/skill installation.
+operator/service/skill installation with automatic OpenClaw/Hermes MCP
+registration and probing.
 
 The broker still stores session, command, lease, and result state in memory.
 The in-memory state is now durably mirrored and recovered, but a future schema
 migration layer is still required before the durable format is declared
-stable. Broker identity pinning, a dedicated updater, priority control traffic,
-platform-native MCP auto-registration, and real network-failure injection remain immediate
-`0.6` work; see `PRODUCTION_VISION.md`.
+stable. Broker identity pinning, a dedicated updater, proactive private
+conversation notification, conversation-bound approvals, and real
+network-failure injection remain immediate `0.6` work; see
+`PRODUCTION_VISION.md`.
 
 A Windows x64 proof of concept has exercised pairing, `system.info`, process
 listing, a harmless user-level shell command, scoped file operations,

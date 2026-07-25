@@ -18,12 +18,12 @@ commands require a separate local UAC approval and the project does not bypass
 Windows security controls. Owned Windows processes are placed in kill-on-close
 Job Objects so cancellation can terminate their descendants.
 
-Residual risks: broker state is not durable; transport TLS is supplied by the
-deployment proxy rather than the broker; delivery leases prevent execution
-without acknowledgement but running-command recovery after disconnect still
-needs durable state; reparse-point and time-of-check/time-of-use attacks need a
-larger adversarial Windows matrix; Authenticode, the official OpenClaw adapter,
-the native GUI, full ConPTY integration, and proactive agent approval
+Residual risks: the durable broker snapshot format does not yet have stable
+schema migrations; transport TLS is supplied by the deployment proxy rather
+than the broker; recovered acknowledged commands remain explicitly uncertain
+until their result arrives; reparse-point and time-of-check/time-of-use attacks
+need a larger adversarial Windows matrix; Authenticode, the native GUI, full
+ConPTY integration, conversation-bound approval, and proactive agent approval
 notifications are incomplete.
 Operators must keep the broker on loopback, protect its admin token, expose it
 only through authenticated TLS infrastructure, and treat Developer sessions as

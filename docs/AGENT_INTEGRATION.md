@@ -33,7 +33,18 @@ read the protected local environment.
 
 ## MCP registration
 
-Register the installed executable as a local stdio MCP server:
+The standard setup registers and probes the installed executable automatically.
+Select the desired agent with:
+
+```sh
+BRIDGE_AGENT_TARGET=openclaw ./scripts/setup-operator.sh
+BRIDGE_AGENT_TARGET=hermes ./scripts/setup-operator.sh
+BRIDGE_AGENT_TARGET=both ./scripts/setup-operator.sh
+```
+
+`auto` (the default) prefers OpenClaw and otherwise selects Hermes. Use
+`BRIDGE_SETUP_NO_REGISTER=1` for an unsupported agent or a deliberately manual
+installation. The equivalent local stdio entry is:
 
 ```json
 {
@@ -45,9 +56,9 @@ Register the installed executable as a local stdio MCP server:
 }
 ```
 
-OpenClaw and Hermes may store MCP registration in different configuration
-files; their installer integration should write the platform-native entry
-rather than requiring a second messaging bot.
+The installer uses each platform's native CLI and probes all six tools before
+reporting success. It stores only the executable path in agent configuration;
+the administrator token remains in the protected Bridge operator environment.
 
 ## Fallback transport
 

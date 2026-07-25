@@ -81,10 +81,11 @@ cp .env.example .env
 
 The setup builds or container-builds the broker, typed operator CLI, and
 standalone MCP adapter, installs the user service, and installs the bundled
-agent skill. OpenClaw, Hermes, or another MCP-capable agent uses its existing
-private conversation for approval; no second Telegram bot is required. Guest
-machines still receive standalone signed binaries and require no Go, Python,
-Node.js, Docker, Git, OpenClaw, or administrator setup for portable sessions.
+agent skill. It also detects OpenClaw or Hermes, registers the local adapter,
+and verifies its tools. Set `BRIDGE_AGENT_TARGET=both` when both agents should
+receive the adapter. No second Telegram bot is required. Guest machines still
+receive standalone signed binaries and require no Go, Python, Node.js, Docker,
+Git, OpenClaw, or administrator setup for portable sessions.
 
 ## Build and test
 

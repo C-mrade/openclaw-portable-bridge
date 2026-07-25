@@ -83,6 +83,10 @@ if [[ ${BRIDGE_SETUP_NO_START:-0} != 1 ]]; then
   systemctl --user --no-pager --full status openclaw-portable-bridge-broker.service
 fi
 
+if [[ ${BRIDGE_SETUP_NO_REGISTER:-0} != 1 ]]; then
+  "$project_dir/scripts/register-agent.sh" \
+    "${BRIDGE_AGENT_TARGET:-auto}" "$install_dir/bridge-mcp"
+fi
+
 printf '\nInstalled broker, bridge-operator, bridge-mcp, and agent skill.\n'
 printf 'Run: bridge-operator pending\n'
-printf 'Register MCP command: %s\n' "$install_dir/bridge-mcp"
