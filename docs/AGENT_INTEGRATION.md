@@ -33,6 +33,13 @@ approval surface. The Bridge does not own or poll a messaging bot. This avoids
 duplicate bots, `getUpdates` conflicts, and transport-specific credentials in
 the broker.
 
+For OpenClaw deployments, `scripts/openclaw-approval-notifier.sh` is the
+optional proactive adapter. Run it from the example user timer with an
+allowlisted private destination. It polls only the typed `bridge-operator`
+surface, sends through OpenClaw's existing channel, and records a local marker
+only after successful delivery. The broker still owns request validity and
+expiry; the notifier owns neither credentials nor approval state.
+
 The repository includes an agent skill at
 `skills/openclaw-portable-bridge/SKILL.md`. OpenClaw, Hermes, Codex, or another
 skill-compatible agent can install or reference that directory.

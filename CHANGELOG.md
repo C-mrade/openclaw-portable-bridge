@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add an optional OpenClaw-native proactive approval notifier and user timer
+  that deliver each pending request once through the existing private channel.
 - Return authoritative request, duration, and expiry data after approval so
   agent adapters can render resolved approval state.
 - Require approval surfaces to edit the original prompt, remove stale buttons,
