@@ -58,6 +58,32 @@ func TestPairRejectsUnsupportedProtocolWithNegotiationDetails(t *testing.T) {
 	}
 }
 
+func TestApprovalResponseIncludesResolvedSessionState(t *testing.T) {
+	s, _ := testServer(t)
+	item := s.p["request"]
+	item.Reply.Status = "pending"
+	item.Req.DurationSeconds = 30 * 60
+	w := requestJSON(t, s.approve, http.MethodPost, "/v1/admin/approve", s.admin, map[string]any{
+		"requestId": "request", "minutes": 30,
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("approval failed: %d %s", w.Code, w.Body.String())
+	}
+	var response struct {
+		Status    string    `json:"status"`
+		RequestID string    `json:"requestId"`
+		Minutes   int       `json:"minutes"`
+		ExpiresAt time.Time `json:"expiresAt"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Status != "approved" || response.RequestID != "request" ||
+		response.Minutes != 30 || response.ExpiresAt.IsZero() {
+		t.Fatalf("incomplete resolved state: %#v", response)
+	}
+}
+
 func testServer(t *testing.T) (*server, string) {
 	t.Helper()
 	a, err := audit.Open(t.TempDir() + "/audit.jsonl")

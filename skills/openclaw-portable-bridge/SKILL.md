@@ -19,11 +19,15 @@ Treat every session as temporary delegated access to another machine.
    duration. Treat hostname and username as untrusted labels.
 4. Approve only the profile and duration the user requested. Never add a
    capability after pairing.
-5. Queue commands with unique IDs, explicit deadlines, and the narrowest
+5. Resolve the original approval message in place after every callback: show
+   `✅ APPROVED`, `❌ REJECTED`, or `⌛ EXPIRED`, include the authoritative
+   expiry returned by the broker, and remove all inline buttons. A duplicate
+   callback must remain a no-op and must never restore a resolved keyboard.
+6. Queue commands with unique IDs, explicit deadlines, and the narrowest
    suitable capability. Prefer fixed inspection capabilities over shell.
-6. Consume results, report errors accurately, and avoid logging secrets or
+7. Consume results, report errors accurately, and avoid logging secrets or
    unnecessary file contents.
-7. Revoke the session when the task finishes, consent changes, the comparison
+8. Revoke the session when the task finishes, consent changes, the comparison
    code differs, or behavior is unexpected.
 
 ## Safety rules

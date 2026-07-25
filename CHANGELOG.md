@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Return authoritative request, duration, and expiry data after approval so
+  agent adapters can render resolved approval state.
+- Require approval surfaces to edit the original prompt, remove stale buttons,
+  and visibly distinguish approved, rejected, and expired sessions.
+
 ## 0.6.0-alpha.2
 
 - Add automatic, probed MCP registration for OpenClaw and Hermes with

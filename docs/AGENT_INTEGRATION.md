@@ -19,6 +19,15 @@ code and exact capability list, enforce maximum durations, validate typed
 command parameters, and redact credentials from every log. Keep destructive or
 elevated work subject to the agent platform's normal approval policy.
 
+Treat an approval prompt as a small stateful UI, not as an immutable message.
+After a callback succeeds, edit the original message in place, prefix it with
+an unambiguous terminal state (`✅ APPROVED` or `❌ REJECTED`), include the
+resolved duration and expiry when approved, and remove every action button.
+Expired requests must likewise be marked `⌛ EXPIRED`. Duplicate callbacks are
+idempotent and must not restore buttons or create a second approval. The
+approval API returns `requestId`, `minutes`, and `expiresAt` so adapters can
+render the authoritative broker state rather than estimating it locally.
+
 The agent's existing Telegram, Discord, CLI, or web conversation is the
 approval surface. The Bridge does not own or poll a messaging bot. This avoids
 duplicate bots, `getUpdates` conflicts, and transport-specific credentials in

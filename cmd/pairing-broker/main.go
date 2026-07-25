@@ -168,12 +168,16 @@ func (s *server) approve(w http.ResponseWriter, r *http.Request) {
 		write(w, 400, nil)
 		return
 	}
-	if err := s.approveRequest(q.RequestID, q.Minutes); err != nil {
+	expiresAt, err := s.approveRequest(q.RequestID, q.Minutes)
+	if err != nil {
 		write(w, err.status, map[string]string{"error": err.message})
 		return
 	}
 	s.audit.Event("pair_approved", map[string]any{"requestId": q.RequestID, "minutes": q.Minutes})
-	write(w, 200, map[string]string{"status": "approved"})
+	write(w, 200, map[string]any{
+		"status": "approved", "requestId": q.RequestID,
+		"minutes": q.Minutes, "expiresAt": expiresAt,
+	})
 }
 
 type requestError struct {
@@ -183,16 +187,16 @@ type requestError struct {
 
 func (e *requestError) Error() string { return e.message }
 
-func (s *server) approveRequest(requestID string, minutes int) *requestError {
+func (s *server) approveRequest(requestID string, minutes int) (time.Time, *requestError) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	x := s.p[requestID]
 	if x == nil || x.Reply.Status != "pending" {
-		return &requestError{status: http.StatusNotFound, message: "pending request not found"}
+		return time.Time{}, &requestError{status: http.StatusNotFound, message: "pending request not found"}
 	}
 	maxMinutes := int((x.Req.DurationSeconds + 59) / 60)
 	if maxMinutes < 1 || maxMinutes > 60 || minutes < 1 || minutes > maxMinutes {
-		return &requestError{status: http.StatusBadRequest, message: "approval duration exceeds guest request"}
+		return time.Time{}, &requestError{status: http.StatusBadRequest, message: "approval duration exceeds guest request"}
 	}
 	tok, _ := auth.Token()
 	previousReply := x.Reply
@@ -216,9 +220,9 @@ func (s *server) approveRequest(requestID string, minutes int) *requestError {
 			delete(x.Commands, initial.ID)
 		}
 		log.Printf("persist approval: %v", err)
-		return &requestError{status: http.StatusInternalServerError, message: "state unavailable"}
+		return time.Time{}, &requestError{status: http.StatusInternalServerError, message: "state unavailable"}
 	}
-	return nil
+	return x.Reply.ExpiresAt, nil
 }
 
 func (s *server) rejectRequest(requestID string) *requestError {
@@ -439,7 +443,7 @@ func (s *server) adminReject(w http.ResponseWriter, r *http.Request) {
 		write(w, err.status, map[string]string{"error": err.message})
 		return
 	}
-	write(w, 200, map[string]string{"status": "rejected"})
+	write(w, 200, map[string]string{"status": "rejected", "requestId": q.RequestID})
 }
 func (s *server) adminResults(w http.ResponseWriter, r *http.Request) {
 	if !s.isAdmin(r) {
