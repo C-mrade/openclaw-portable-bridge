@@ -120,6 +120,7 @@ configuration, logs, and release keys are intentionally ignored by Git.
 - [Threat model](docs/THREAT_MODEL.md)
 - [Security operations](docs/SECURITY.md)
 - [Deployment and packaging](docs/DEPLOYMENT.md)
+- [Release signing operations](docs/RELEASE_SIGNING.md)
 - [Operator quickstart](docs/QUICKSTART.md)
 - [Agent integration](docs/AGENT_INTEGRATION.md)
 - [Usage](docs/USAGE.md)

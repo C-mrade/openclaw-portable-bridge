@@ -39,14 +39,18 @@ Keep both files outside the repository and outside the portable package.
 
 ```sh
 mkdir -p "$HOME/.config/openclaw-portable-bridge"
+mkdir -p "$HOME/.config/openclaw-portable-bridge/signing"
+chmod 700 "$HOME/.config/openclaw-portable-bridge/signing"
 go run ./cmd/release-tool -mode keygen \
-  -key "$HOME/.config/openclaw-portable-bridge/release.key"
+  -key "$HOME/.config/openclaw-portable-bridge/signing/release.key" \
+  > "$HOME/.config/openclaw-portable-bridge/signing/release.pub"
 openssl rand -base64 32 > "$HOME/.config/openclaw-portable-bridge/admin-token"
-chmod 600 "$HOME/.config/openclaw-portable-bridge/"*
+chmod 600 "$HOME/.config/openclaw-portable-bridge/signing/"*
 ```
 
-Record the public key printed by `release-tool`. Never copy `release.key` or
-`admin-token` to Git, the USB drive, or the guest.
+Never copy `release.key` or `admin-token` to Git, the USB drive, or the guest.
+Create and test an encrypted backup as described in
+[Release signing operations](RELEASE_SIGNING.md).
 
 ## 3. Run the broker on loopback
 
@@ -63,8 +67,6 @@ from outside the operator network before continuing.
 ## 4. Build the signed portable package
 
 ```sh
-export BRIDGE_RELEASE_KEY_FILE="$HOME/.config/openclaw-portable-bridge/release.key"
-export BRIDGE_RELEASE_PUBLIC_KEY='<public-key-printed-in-step-2>'
 cp packaging/usb/config/bridge-public.example.json \
    packaging/usb/config/bridge-public.json
 ```

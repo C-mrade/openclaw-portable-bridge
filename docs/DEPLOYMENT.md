@@ -10,7 +10,8 @@ The build/server machine needs Go 1.24 or Docker, an HTTPS publishing method,
 and a safe location for an Ed25519 release key. None of these are required on
 the Windows guest.
 
-Generate the release key outside the checkout:
+Generate the release key outside the checkout. The standard persistent
+locations are documented in [Release signing operations](RELEASE_SIGNING.md):
 
 ```sh
 go run ./cmd/release-tool -mode keygen -key /secure/path/release.key
@@ -80,14 +81,12 @@ Verify the endpoint from a network outside the operator host before packaging.
 ## 4. Build the signed portable directory
 
 ```sh
-export BRIDGE_RELEASE_KEY_FILE=/secure/path/release.key
-export BRIDGE_RELEASE_PUBLIC_KEY='<public-key-from-keygen>'
 cp packaging/usb/config/bridge-public.example.json \
    packaging/usb/config/bridge-public.json
 ```
 
 Edit `bridge-public.json` with the public HTTPS broker URL and a non-secret USB
-identifier, then run:
+identifier. With the canonical signing files installed, run:
 
 ```sh
 ./scripts/build-release.sh 0.6.0-beta.1

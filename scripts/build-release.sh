@@ -3,8 +3,19 @@ set -euo pipefail
 umask 022
 
 project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-key_file="${BRIDGE_RELEASE_KEY_FILE:?set BRIDGE_RELEASE_KEY_FILE to an Ed25519 private key outside the repository}"
-public_key="${BRIDGE_RELEASE_PUBLIC_KEY:?set BRIDGE_RELEASE_PUBLIC_KEY to the matching base64 public key}"
+config_root="${XDG_CONFIG_HOME:-$HOME/.config}"
+signing_dir="${BRIDGE_RELEASE_SIGNING_DIR:-$config_root/openclaw-portable-bridge/signing}"
+key_file="${BRIDGE_RELEASE_KEY_FILE:-$signing_dir/release.key}"
+public_key_file="${BRIDGE_RELEASE_PUBLIC_KEY_FILE:-$signing_dir/release.pub}"
+if [[ -n "${BRIDGE_RELEASE_PUBLIC_KEY:-}" ]]; then
+  public_key="$BRIDGE_RELEASE_PUBLIC_KEY"
+elif [[ -f "$public_key_file" ]]; then
+  public_key="$(tr -d '\r\n' < "$public_key_file")"
+else
+  printf 'missing release public key: set BRIDGE_RELEASE_PUBLIC_KEY or create %s\n' \
+    "$public_key_file" >&2
+  exit 2
+fi
 version="${1:-0.1.0-mvp-dev}"
 image="${BRIDGE_BUILD_IMAGE:-golang:1.24-bookworm}"
 container_user="$(id -u):$(id -g)"
@@ -27,7 +38,10 @@ if [[ ! "$public_key" =~ ^[A-Za-z0-9+/]+$ ]]; then
   printf 'invalid base64 release public key\n' >&2
   exit 2
 fi
-test -f "$key_file"
+if [[ ! -f "$key_file" ]]; then
+  printf 'missing release private key: %s\n' "$key_file" >&2
+  exit 2
+fi
 
 docker run --rm --user "$container_user" \
   -e GOCACHE=/tmp/go-cache \

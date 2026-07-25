@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Load release signing material from a canonical operator configuration
+  directory by default, while retaining explicit environment overrides for CI
+  and external signers.
+- Document encrypted backup, recovery verification, and complete trust-root
+  rotation so release builds do not depend on session-only environment state.
+
 ## 0.6.0-beta.1
 
 - Add an optional OpenClaw-native proactive approval notifier and user timer

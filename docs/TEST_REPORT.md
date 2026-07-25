@@ -8,6 +8,8 @@
   rejected before network access.
 - Clean staged release assembly, complete checksum verification, and
   mixed-version package rejection.
+- Canonical signing-key discovery plus a full `0.6.0-beta.1` six-target build
+  under a rotated trust root, with key-pair and complete checksum verification.
 - Atomic broker-state snapshots with restrictive permissions.
 - Restart recovery requeues unacknowledged leases without replaying commands
   already acknowledged as running.
