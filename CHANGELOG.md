@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.2-beta.2
+
+- Restart the broker automatically when an operator upgrade changes its binary
+  or systemd unit, while keeping identical installs restart-free.
+- Return paginated, filterable, typed service and process inventories with
+  compact summaries instead of unbounded platform text.
+
 ## 0.6.2-beta.1
 
 - Removed clear session tokens from durable broker snapshots without losing

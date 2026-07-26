@@ -132,7 +132,7 @@ public key before building the Windows package:
 go run ./cmd/release-tool -mode keygen -key /secure/path/release.key
 export BRIDGE_RELEASE_KEY_FILE=/secure/path/release.key
 export BRIDGE_RELEASE_PUBLIC_KEY='<public-key-printed-by-keygen>'
-./scripts/build-release.sh 0.6.2-beta.1
+./scripts/build-release.sh 0.6.2-beta.2
 ```
 
 Copy `packaging/usb/config/bridge-public.example.json` to

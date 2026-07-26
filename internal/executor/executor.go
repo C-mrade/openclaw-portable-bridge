@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/csv"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -17,6 +18,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -158,13 +160,7 @@ func (e *Executor) Execute(cmd protocol.Command) (string, error) {
 		}
 		return e.readOnlyCommand(cmd, []string{"df", "-P"})
 	case "service.list":
-		if runtime.GOOS == "windows" {
-			return e.readOnlyCommand(cmd, []string{"powershell.exe", "-NoProfile", "-NonInteractive", "-Command", "Get-Service | Select-Object Name,DisplayName,Status,StartType | ConvertTo-Json -Compress"})
-		}
-		if runtime.GOOS == "darwin" {
-			return e.readOnlyCommand(cmd, []string{"launchctl", "list"})
-		}
-		return e.readOnlyCommand(cmd, []string{"systemctl", "list-units", "--type=service", "--all", "--no-pager", "--no-legend"})
+		return e.serviceList(cmd)
 	case "process.list":
 		return e.processList(cmd)
 	case "process.start":
@@ -522,6 +518,10 @@ func exitCode(e error) int {
 	return -1
 }
 func (e *Executor) processList(c protocol.Command) (string, error) {
+	options, err := decodeListOptions(c.Params)
+	if err != nil {
+		return "", err
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout(c))
 	defer cancel()
 	var x *exec.Cmd
@@ -534,8 +534,191 @@ func (e *Executor) processList(c protocol.Command) (string, error) {
 	var out capped
 	x.Stdout = &out
 	x.Stderr = &out
-	err := x.Run()
-	return marshalWithError(map[string]any{"output": out.b.String(), "truncated": out.n >= MaxOutput}, err)
+	if err = x.Run(); err != nil {
+		return "", err
+	}
+	raw, count := out.snapshot()
+	if count >= MaxOutput {
+		return "", errors.New("process inventory exceeded safe collection limit")
+	}
+	items, err := parseProcessInventory(raw)
+	if err != nil {
+		return "", err
+	}
+	return marshalPage(items, options, func(item processItem) string {
+		return item.Name + " " + strconv.Itoa(item.PID) + " " + item.Session
+	})
+}
+
+type listOptions struct {
+	Offset int    `json:"offset"`
+	Limit  int    `json:"limit"`
+	Filter string `json:"filter"`
+}
+
+func decodeListOptions(raw json.RawMessage) (listOptions, error) {
+	var options listOptions
+	if len(raw) == 0 {
+		raw = json.RawMessage(`{}`)
+	}
+	if decode(raw, &options) != nil || options.Offset < 0 || options.Limit < 0 ||
+		options.Limit > 500 || len(options.Filter) > 256 || strings.IndexByte(options.Filter, 0) >= 0 {
+		return options, errors.New("invalid inventory list request")
+	}
+	if options.Limit == 0 {
+		options.Limit = 100
+	}
+	return options, nil
+}
+
+type processItem struct {
+	Name    string `json:"name"`
+	PID     int    `json:"pid"`
+	Session string `json:"session,omitempty"`
+	Memory  string `json:"memory,omitempty"`
+}
+
+func parseProcessInventory(raw []byte) ([]processItem, error) {
+	if runtime.GOOS == "windows" {
+		records, err := csv.NewReader(strings.NewReader(string(raw))).ReadAll()
+		if err != nil {
+			return nil, fmt.Errorf("parse process inventory: %w", err)
+		}
+		items := make([]processItem, 0, len(records))
+		for _, record := range records {
+			if len(record) < 2 {
+				continue
+			}
+			pid, err := strconv.Atoi(record[1])
+			if err != nil {
+				continue
+			}
+			item := processItem{Name: record[0], PID: pid}
+			if len(record) > 2 {
+				item.Session = record[2]
+			}
+			if len(record) > 4 {
+				item.Memory = record[4]
+			}
+			items = append(items, item)
+		}
+		return items, nil
+	}
+	items := []processItem{}
+	for _, line := range strings.Split(string(raw), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		pid, err := strconv.Atoi(fields[0])
+		if err == nil {
+			items = append(items, processItem{PID: pid, Name: strings.Join(fields[1:], " ")})
+		}
+	}
+	return items, nil
+}
+
+type serviceItem struct {
+	Name        string `json:"name"`
+	DisplayName string `json:"displayName,omitempty"`
+	Status      string `json:"status,omitempty"`
+	StartType   string `json:"startType,omitempty"`
+}
+
+func (e *Executor) serviceList(c protocol.Command) (string, error) {
+	options, err := decodeListOptions(c.Params)
+	if err != nil {
+		return "", err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout(c))
+	defer cancel()
+	var x *exec.Cmd
+	switch runtime.GOOS {
+	case "windows":
+		script := "@(Get-Service | ForEach-Object { [pscustomobject]@{name=$_.Name;displayName=$_.DisplayName;status=$_.Status.ToString();startType=$_.StartType.ToString()} }) | ConvertTo-Json -Compress"
+		x = exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script)
+	case "darwin":
+		x = exec.CommandContext(ctx, "launchctl", "list")
+	default:
+		x = exec.CommandContext(ctx, "systemctl", "list-units", "--type=service", "--all", "--no-pager", "--no-legend", "--plain")
+	}
+	e.prepare(x)
+	var out capped
+	x.Stdout = &out
+	x.Stderr = &out
+	if err = x.Run(); err != nil {
+		return "", err
+	}
+	raw, count := out.snapshot()
+	if count >= MaxOutput {
+		return "", errors.New("service inventory exceeded safe collection limit")
+	}
+	items, err := parseServiceInventory(raw)
+	if err != nil {
+		return "", err
+	}
+	return marshalPage(items, options, func(item serviceItem) string {
+		return item.Name + " " + item.DisplayName + " " + item.Status + " " + item.StartType
+	})
+}
+
+func parseServiceInventory(raw []byte) ([]serviceItem, error) {
+	if runtime.GOOS == "windows" {
+		var items []serviceItem
+		if err := json.Unmarshal(raw, &items); err != nil {
+			return nil, fmt.Errorf("parse service inventory: %w", err)
+		}
+		return items, nil
+	}
+	items := []serviceItem{}
+	for _, line := range strings.Split(string(raw), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
+		}
+		item := serviceItem{Name: fields[0]}
+		if runtime.GOOS == "darwin" {
+			if len(fields) > 2 {
+				item.DisplayName = strings.Join(fields[2:], " ")
+			}
+		} else {
+			if len(fields) > 2 {
+				item.Status = fields[2]
+			}
+			if len(fields) > 4 {
+				item.DisplayName = strings.Join(fields[4:], " ")
+			}
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+func marshalPage[T any](items []T, options listOptions, searchable func(T) string) (string, error) {
+	filtered := make([]T, 0, len(items))
+	needle := strings.ToLower(options.Filter)
+	for _, item := range items {
+		if needle == "" || strings.Contains(strings.ToLower(searchable(item)), needle) {
+			filtered = append(filtered, item)
+		}
+	}
+	sort.SliceStable(filtered, func(i, j int) bool {
+		return strings.ToLower(searchable(filtered[i])) < strings.ToLower(searchable(filtered[j]))
+	})
+	total := len(filtered)
+	start := min(options.Offset, total)
+	end := min(start+options.Limit, total)
+	return marshal(map[string]any{
+		"items": filtered[start:end],
+		"summary": map[string]int{
+			"matched":  total,
+			"returned": end - start,
+		},
+		"offset":  start,
+		"limit":   options.Limit,
+		"total":   total,
+		"hasMore": end < total,
+	})
 }
 func (e *Executor) processStart(c protocol.Command) (string, error) {
 	var p struct {

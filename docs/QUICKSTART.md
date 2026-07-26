@@ -142,7 +142,7 @@ Edit `bridge-public.json` and set your public HTTPS broker URL and a non-secret
 USB identifier, then build:
 
 ```sh
-./scripts/build-release.sh 0.6.2-beta.1
+./scripts/build-release.sh 0.6.2-beta.2
 ```
 
 The build signs the public configuration, assembles every target in a clean

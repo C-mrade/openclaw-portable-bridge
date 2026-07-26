@@ -71,6 +71,17 @@ else
   exit 2
 fi
 
+broker_restart_required=0
+if [[ -f "$install_dir/pairing-broker" ]] &&
+   ! cmp -s "$build_dir/pairing-broker" "$install_dir/pairing-broker"; then
+  broker_restart_required=1
+fi
+if [[ -f "$unit_dir/openclaw-portable-bridge-broker.service" ]] &&
+   ! cmp -s "$project_dir/packaging/systemd/openclaw-portable-bridge-broker.service.example" \
+     "$unit_dir/openclaw-portable-bridge-broker.service"; then
+  broker_restart_required=1
+fi
+
 install -m 0755 "$build_dir/pairing-broker" "$install_dir/pairing-broker"
 install -m 0755 "$build_dir/bridge-operator" "$install_dir/bridge-operator"
 install -m 0755 "$build_dir/bridge-mcp" "$install_dir/bridge-mcp"
@@ -92,7 +103,13 @@ cp -R "$project_dir/skills/openclaw-portable-bridge" "$openclaw_workspace/skills
 
 if [[ ${BRIDGE_SETUP_NO_START:-0} != 1 ]]; then
   systemctl --user daemon-reload
-  systemctl --user enable --now openclaw-portable-bridge-broker.service
+  if systemctl --user is-active --quiet openclaw-portable-bridge-broker.service; then
+    if [[ "$broker_restart_required" == 1 ]]; then
+      systemctl --user restart openclaw-portable-bridge-broker.service
+    fi
+  else
+    systemctl --user enable --now openclaw-portable-bridge-broker.service
+  fi
   systemctl --user --no-pager --full status openclaw-portable-bridge-broker.service
 fi
 

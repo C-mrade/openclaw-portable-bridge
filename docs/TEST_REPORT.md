@@ -56,8 +56,10 @@
   service and process inspection; non-elevated shell and PowerShell; visible
   scoped/full-volume filesystem behavior; immediate revocation and confirmed
   post-revoke rejection.
-- Clean `0.6.2-beta.1` agent-first bootstrap, signed six-target package,
+- Clean `0.6.2-beta.2` agent-first bootstrap, signed six-target package,
   checksum inventory, diagnostics, and idempotent second apply.
+- Typed, filterable, bounded service and process inventories, including
+  pagination validation and compact match/return summaries.
 
 ## Deferred
 

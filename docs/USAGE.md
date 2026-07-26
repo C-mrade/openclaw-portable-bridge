@@ -22,6 +22,9 @@ Developer automation can use `shell.start`, `shell.status`, and `shell.cancel`
 for long-running cancellable jobs. Large files can be transferred through
 `files.read-chunk` and `files.write-chunk`; final writes require the expected
 whole-file SHA-256. Directory listings accept `offset`, `limit`, and `filter`.
+`service.list` and `process.list` accept the same optional pagination fields
+and return typed `items`, a compact `summary`, and `hasMore`. Their default page
+contains 100 items and the maximum accepted page contains 500.
 
 Every received capability is shown in the guest activity stream, while bulk
 transfer payloads are never printed. Developer intentionally retains complete

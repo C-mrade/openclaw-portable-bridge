@@ -8,6 +8,7 @@ import (
 	"github.com/C-mrade/openclaw-portable-bridge/internal/protocol"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -16,6 +17,44 @@ func TestNormalizeUTF16LE(t *testing.T) {
 	raw := []byte{0xff, 0xfe, 'O', 0, 'K', 0, '\r', 0, '\n', 0}
 	if got := normalizeOutput(raw); got != "OK\r\n" {
 		t.Fatalf("unexpected normalized output %q", got)
+	}
+}
+
+func TestInventoryPaginationAndFiltering(t *testing.T) {
+	items := []processItem{
+		{Name: "worker.exe", PID: 20, Session: "Console"},
+		{Name: "agent.exe", PID: 10, Session: "Services"},
+		{Name: "agent-helper.exe", PID: 30, Session: "Console"},
+	}
+	result, err := marshalPage(items, listOptions{Offset: 1, Limit: 1, Filter: "agent"}, func(item processItem) string {
+		return item.Name + " " + strconv.Itoa(item.PID) + " " + item.Session
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var page struct {
+		Items   []processItem  `json:"items"`
+		Summary map[string]int `json:"summary"`
+		HasMore bool           `json:"hasMore"`
+	}
+	if err = json.Unmarshal([]byte(result), &page); err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Items) != 1 || page.Items[0].Name != "agent.exe" ||
+		page.Summary["matched"] != 2 || page.Summary["returned"] != 1 || page.HasMore {
+		t.Fatalf("unexpected inventory page: %#v", page)
+	}
+}
+
+func TestInventoryOptionsAreBounded(t *testing.T) {
+	params := json.RawMessage(`{"limit":501}`)
+	if _, err := decodeListOptions(params); err == nil {
+		t.Fatal("oversized inventory page accepted")
+	}
+	params = json.RawMessage(`{"offset":2,"limit":25,"filter":"active"}`)
+	options, err := decodeListOptions(params)
+	if err != nil || options.Offset != 2 || options.Limit != 25 || options.Filter != "active" {
+		t.Fatalf("unexpected inventory options: %#v, %v", options, err)
 	}
 }
 
