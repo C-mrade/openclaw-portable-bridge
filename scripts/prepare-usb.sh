@@ -35,8 +35,14 @@ archive_from_usb() {
   fi
   mkdir -p "$backup_root"
   cp -a -- "$source" "$target"
-  if [[ -d "$target" && -s "$target/SHA256SUMS.txt" ]]; then
-    (cd "$target" && sha256sum -c SHA256SUMS.txt >/dev/null)
+  if [[ -d "$source" ]]; then
+    diff -qr -- "$source" "$target" >/dev/null
+  else
+    cmp -s -- "$source" "$target"
+  fi
+  if [[ -d "$target" && -s "$target/SHA256SUMS.txt" ]] &&
+     ! (cd "$target" && sha256sum -c SHA256SUMS.txt >/dev/null 2>&1); then
+    printf 'WARNING: archived legacy package had pre-existing checksum mismatches: %s\n' "$source" >&2
   fi
   rm -rf -- "$source"
   printf 'Archived off the USB: %s -> %s\n' "$source" "$target"
