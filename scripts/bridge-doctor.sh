@@ -6,17 +6,29 @@ config_root="${XDG_CONFIG_HOME:-$HOME/.config}/openclaw-portable-bridge"
 public_url=""
 failures=0
 warnings=0
+json=0
+checks='[]'
 
-if [[ "${1:-}" == "--public-url" ]]; then
-  public_url="${2:-}"
-elif [[ $# -gt 0 ]]; then
-  printf 'Usage: %s [--public-url HTTPS_URL]\n' "$0" >&2
-  exit 2
-fi
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --public-url) public_url="${2:-}"; shift 2 ;;
+    --json) json=1; shift ;;
+    *)
+      printf 'Usage: %s [--json] [--public-url HTTPS_URL]\n' "$0" >&2
+      exit 2
+      ;;
+  esac
+done
 
-pass() { printf 'PASS  %s\n' "$*"; }
-warn() { printf 'WARN  %s\n' "$*"; warnings=$((warnings + 1)); }
-fail() { printf 'FAIL  %s\n' "$*"; failures=$((failures + 1)); }
+record() {
+  local status="$1" message="$2"
+  checks="$(jq -cn --argjson old "$checks" --arg status "$status" --arg message "$message" \
+    '$old + [{status:$status,message:$message}]')"
+  [[ "$json" == 1 ]] || printf '%-5s %s\n' "${status^^}" "$message"
+}
+pass() { record pass "$*"; }
+warn() { record warn "$*"; warnings=$((warnings + 1)); }
+fail() { record fail "$*"; failures=$((failures + 1)); }
 
 for command_name in curl jq openssl; do
   command -v "$command_name" >/dev/null && pass "$command_name available" ||
@@ -40,12 +52,14 @@ if [[ -e "$key_file" ]]; then
     fail "release private key mode is ${mode:-unknown}, expected 600"
 fi
 
-if command -v systemctl >/dev/null; then
+if [[ ${BRIDGE_SETUP_NO_START:-0} == 1 ]]; then
+  warn "service and live broker checks skipped by BRIDGE_SETUP_NO_START"
+elif command -v systemctl >/dev/null; then
   systemctl --user is-active --quiet openclaw-portable-bridge-broker.service &&
     pass "broker service active" || fail "broker service inactive"
 fi
 
-if [[ -x "$HOME/.local/bin/bridge-operator" ]]; then
+if [[ -x "$HOME/.local/bin/bridge-operator" && ${BRIDGE_SETUP_NO_START:-0} != 1 ]]; then
   "$HOME/.local/bin/bridge-operator" pending >/dev/null 2>&1 &&
     pass "broker operator API reachable" || fail "broker operator API unreachable"
 fi
@@ -71,5 +85,14 @@ if [[ -n "$public_url" ]]; then
   fi
 fi
 
-printf '\nDoctor summary: %d failure(s), %d warning(s)\n' "$failures" "$warnings"
+if [[ "$json" == 1 ]]; then
+  jq -cn \
+    --argjson ok "$([[ "$failures" -eq 0 ]] && printf true || printf false)" \
+    --argjson failures "$failures" \
+    --argjson warnings "$warnings" \
+    --argjson checks "$checks" \
+    '{schemaVersion:1,ok:$ok,failures:$failures,warnings:$warnings,checks:$checks}'
+else
+  printf '\nDoctor summary: %d failure(s), %d warning(s)\n' "$failures" "$warnings"
+fi
 [[ "$failures" -eq 0 ]]

@@ -15,6 +15,13 @@ jobs:
       - run: bash -n scripts/*.sh
       - run: ./scripts/install.sh --help
       - run: |
+          ./scripts/bridge-bootstrap.sh discover | jq -e '.schemaVersion == 1'
+          ./scripts/bridge-bootstrap.sh plan \
+            --publisher existing \
+            --public-url https://bridge.example.com \
+            --agent none |
+            jq -e '.ready == true and (.consentGates | length) == 1'
+      - run: |
           if ./scripts/install.sh --non-interactive --public-url http://insecure.example; then
             echo "installer accepted an insecure public URL" >&2
             exit 1
@@ -28,13 +35,17 @@ jobs:
           export BRIDGE_SETUP_NO_REGISTER=1
           export BRIDGE_INSTALL_SKIP_DOCTOR=1
           mkdir -p "$HOME"
-          ./scripts/install.sh --non-interactive \
+          ./scripts/bridge-bootstrap.sh apply \
+            --approve-publication \
+            --publisher existing \
             --public-url https://bridge.example.com \
             --agent none
           test -x "$HOME/.local/bin/bridge-operator"
           test -s "$HOME/.config/openclaw-portable-bridge/signing/release.key"
+          test -s "$HOME/.local/state/openclaw-portable-bridge/bootstrap.json"
           test -s packaging/usb/SHA256SUMS.txt
           (cd packaging/usb && sha256sum -c SHA256SUMS.txt)
+          ./scripts/bridge-bootstrap.sh status | jq -e '.configured == true and .doctor.ok == true'
 
   test:
     runs-on: ubuntu-latest

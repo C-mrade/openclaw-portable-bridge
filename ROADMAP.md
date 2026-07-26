@@ -26,6 +26,20 @@ Exit gate: a fresh operator can run one guided command, provide their HTTPS
 endpoint and optional private approval IDs, prepare a verified USB, and approve
 a real guest from their existing agent conversation.
 
+### M1.1 — agent-owned bootstrap (`0.6.1`)
+
+- Expose read-only host discovery and deterministic install plans as JSON.
+- Separate agent-executable work from human consent gates.
+- Make apply resumable and idempotent without persisting generated secrets.
+- Automate an approved Tailscale Funnel publication while keeping the broker
+  loopback-only.
+- Provide machine-readable status and diagnostics for autonomous recovery.
+- Keep the interactive installer as a human fallback.
+
+Exit gate: an OpenClaw or Hermes agent can take a clean supported Linux host
+from clone to a verified signed package, asking the human only to approve a new
+HTTPS trust/publication boundary and other genuinely sensitive actions.
+
 ## M2 — trustworthy guest experience (`0.7`)
 
 - Replace the console with a native, dependency-free guest window and tray

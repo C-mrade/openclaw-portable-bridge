@@ -1,6 +1,39 @@
 # Operator quickstart
 
-## Guided setup
+## Agent-first setup
+
+The normal path is to ask a trusted OpenClaw or Hermes agent to install and
+configure the Bridge. The agent starts with:
+
+```sh
+git clone https://github.com/C-mrade/openclaw-portable-bridge.git
+cd openclaw-portable-bridge
+./scripts/bridge-bootstrap.sh discover
+./scripts/bridge-bootstrap.sh plan --publisher tailscale-funnel --agent auto
+```
+
+Both commands are read-only and return JSON. The plan identifies missing
+prerequisites and explicit human consent gates. After the human approves HTTPS
+publication, the agent may execute the exact plan:
+
+```sh
+./scripts/bridge-bootstrap.sh apply --publisher tailscale-funnel \
+  --agent auto --approve-publication
+```
+
+For an already provisioned reverse proxy or tunnel, use `--publisher existing
+--public-url https://bridge.example.com`. Trusting a new endpoint also requires
+the publication approval flag. `status` combines the persisted non-secret
+bootstrap state with machine-readable diagnostics:
+
+```sh
+./scripts/bridge-bootstrap.sh status
+```
+
+An identical successful `apply` is a no-op. Agents can therefore safely resume
+after context loss without rotating keys or rebuilding the deployment.
+
+## Guided human fallback
 
 The shortest safe path from a fresh clone is:
 

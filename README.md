@@ -67,19 +67,25 @@ There are two distinct environments:
    and publishes only that broker through HTTPS.
 2. **Windows guest:** runs the finished USB package with no prerequisites.
 
-For the guided path, clone the repository and run:
+The primary setup is agent-first. Ask a trusted OpenClaw or Hermes agent to
+install the Bridge; it can inspect the host and produce an approval plan with:
 
 ```sh
-./scripts/install.sh
+./scripts/bridge-bootstrap.sh discover
+./scripts/bridge-bootstrap.sh plan --publisher tailscale-funnel --agent auto
 ```
 
-The installer creates the operator token and persistent release trust root,
+After the human approves the plan's HTTPS publication gate, the agent runs
+`apply` and verifies `status`. The bootstrap emits JSON, persists non-secret
+resume state, and is idempotent. It discovers prerequisites and agent runtimes,
+can configure Tailscale Funnel, creates the operator token and persistent release trust root,
 configures the local agent integration, builds and verifies the signed portable
-package, and runs diagnostics. Pass `--usb-dir /media/USER/DRIVE` to prepare a
-mounted USB atomically. It does not weaken the architecture by exposing the
-broker directly: the operator must supply an existing public HTTPS URL backed
-by a hardened reverse proxy or tunnel. The guided multi-platform build
-currently requires Docker on the Linux operator; guest machines require
+package, and can prepare mounted USB media atomically. The agent still cannot
+approve public exposure, invent approver identities, or bypass local consent.
+The broker remains on loopback.
+
+For the guided human fallback, run `./scripts/install.sh`. The multi-platform
+build currently requires Docker on the Linux operator; guest machines require
 nothing.
 
 Start with the [operator quickstart](docs/QUICKSTART.md), then use the complete

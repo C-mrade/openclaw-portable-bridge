@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.1-beta.1
+
+- Added `bridge-bootstrap.sh` as the agent-facing discovery, plan, apply, and
+  status control plane.
+- Added explicit consent gates for new HTTPS endpoint trust and Tailscale
+  Funnel publication.
+- Added non-secret bootstrap state, plan fingerprinting, and idempotent resume.
+- Added machine-readable `bridge-doctor --json` diagnostics.
+- Updated the bundled agent skill and operator documentation for agent-owned
+  installation.
+
 ## Unreleased
 
 - Add a guided `install.sh` path that generates per-deployment credentials and

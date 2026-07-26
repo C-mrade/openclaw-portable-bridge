@@ -35,6 +35,12 @@ agent-native approval, a reserved control-command lane, and one-command
 operator/service/skill installation with automatic OpenClaw/Hermes MCP
 registration and probing.
 
+The `0.6.1-beta.1` agent bootstrap adds read-only JSON discovery, deterministic
+plans with explicit consent gates, idempotent/resumable apply state,
+human-approved Tailscale Funnel publication, and JSON diagnostics. OpenClaw or
+Hermes can now own the routine setup while humans retain decisions about
+public exposure, endpoint trust, identity, and session approval.
+
 The broker keeps a live in-memory model that is durably mirrored and recovered;
 a future schema
 migration layer is still required before the durable format is declared

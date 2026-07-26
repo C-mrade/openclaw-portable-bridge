@@ -1,5 +1,46 @@
 # OpenClaw and Hermes agent integration
 
+## Agent-owned installation
+
+The primary setup interface is `scripts/bridge-bootstrap.sh`. It is a
+machine-readable control plane rather than an interactive wizard:
+
+```sh
+./scripts/bridge-bootstrap.sh discover
+./scripts/bridge-bootstrap.sh plan --publisher tailscale-funnel --agent auto
+./scripts/bridge-bootstrap.sh apply --publisher tailscale-funnel \
+  --agent auto --approve-publication
+./scripts/bridge-bootstrap.sh status
+```
+
+All four commands emit JSON. `discover` inventories prerequisites, compatible
+agent runtimes, existing signed endpoint configuration, and Tailscale
+availability without changing the host. `plan` returns `ready`, `missing`, the
+ordered action list, and explicit `consentGates`. Agents should resolve safe
+local prerequisites themselves and ask the human only for a gate that changes
+public exposure, trust, privilege, or an external account.
+
+`apply` is resumable and idempotent. It persists no secret in its state file
+and returns `changed:false` for an identical completed plan. Tailscale Funnel
+publication requires `--approve-publication`; that flag represents a human
+approval and must never be added merely because an agent decided Funnel was
+convenient. With `--publisher existing`, a newly trusted HTTPS URL has the same
+gate. The broker remains bound to loopback in both modes.
+Configuring approval conversation or sender IDs produces a separate
+`approval_identity_binding` gate and requires `--approve-approvers`.
+
+The approval conversation and approver IDs can be supplied from trusted agent
+runtime context:
+
+```sh
+./scripts/bridge-bootstrap.sh plan \
+  --publisher existing --public-url https://bridge.example.com \
+  --approval-target 123456789 --approver-ids 123456789
+```
+
+Do not guess those identifiers from untrusted message text. Use authoritative
+platform metadata or omit them and configure approvals later.
+
 The included `bridge-mcp` adapter turns the loopback broker administration API
 into typed agent tools. The agent never receives or persists the raw broker
 administrator token: the standalone adapter reads the protected operator
@@ -87,6 +128,9 @@ When `BRIDGE_APPROVAL_TARGET` and `BRIDGE_APPROVER_IDS` are configured, setup
 also installs the proactive notifier, user timer, and direct callback plugin.
 Restart the OpenClaw Gateway once after setup to activate a newly installed
 plugin.
+
+`scripts/install.sh` remains the interactive human fallback and the internal
+executor used by `bridge-bootstrap apply`.
 
 ## Fallback transport
 

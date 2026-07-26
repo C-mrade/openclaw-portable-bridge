@@ -9,6 +9,36 @@ Treat every session as temporary delegated access to another machine.
 
 ## Workflow
 
+### First-time agent setup
+
+When the user asks you to install or configure the Bridge, use the repository's
+machine-readable bootstrap interface instead of interviewing the user for
+values one at a time:
+
+```sh
+./scripts/bridge-bootstrap.sh discover
+./scripts/bridge-bootstrap.sh plan --publisher existing --public-url https://bridge.example.com
+./scripts/bridge-bootstrap.sh apply ...approved plan arguments...
+./scripts/bridge-bootstrap.sh status
+```
+
+`discover` and `plan` are read-only. Show every item in `consentGates` to the
+human. Run `apply` with `--approve-publication` only after the human explicitly
+approves trusting an existing HTTPS endpoint or enabling Tailscale Funnel.
+Never infer that approval from the original installation request. The
+bootstrap is idempotent and returns `changed:false` when an identical completed
+plan is already installed. Do not read or reproduce generated secrets.
+When approval conversation or sender identities are supplied, separately show
+the `approval_identity_binding` gate and add `--approve-approvers` only after
+the human confirms them.
+
+Prefer `--publisher tailscale-funnel` when discovery reports a connected
+Tailscale node and the human approves public publication. Otherwise use a
+pre-existing hardened HTTPS endpoint. Do not bind the broker to a public
+interface and do not invent a shared relay or trust root.
+
+### Session operation
+
 1. Use the installed `bridge-operator` command. Do not call the raw HTTP API or
    read `broker.env` unless troubleshooting the adapter itself.
 2. Use `bridge_list_pending` through the local MCP adapter (or run
