@@ -2,6 +2,10 @@
 /*.jsonl
 /.tmp/
 /packaging/usb/OPENCLAW BRIDGE.exe
+/packaging/usb/OPENCLAW BRIDGE - *.exe
+/packaging/usb/OPENCLAW BRIDGE - *.command
+/packaging/usb/START HERE.txt
+/packaging/usb/icons/
 /packaging/usb/launchers/
 /packaging/usb/SHA256SUMS.txt
 /packaging/usb/VERSION.txt

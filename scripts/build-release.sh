@@ -24,6 +24,7 @@ staging_dir="$(mktemp -d "$project_dir/packaging/.usb-staging.XXXXXX")"
 staging_rel="${staging_dir#"$project_dir/"}"
 
 cleanup() {
+  rm -f -- "$project_dir"/cmd/usb-launcher/rsrc_windows_*.syso
   if [[ -d "$staging_dir" ]]; then
     rm -rf -- "$staging_dir"
   fi
@@ -55,6 +56,7 @@ go run -buildvcs=false ./cmd/release-tool \
   -public-key '$public_key'"
 
 mkdir -p \
+  "$staging_dir/icons" \
   "$staging_dir/bin" \
   "$staging_dir/config" \
   "$staging_dir/docs" \
@@ -62,6 +64,27 @@ mkdir -p \
   "$staging_dir/payload"
 printf '%s\n' "$version" > "$staging_dir/VERSION.txt"
 cp "$package_dir/README.md" "$staging_dir/README.md"
+cp "$project_dir/packaging/START-HERE.txt" "$staging_dir/START HERE.txt"
+docker run --rm --user "$container_user" \
+  -e GOCACHE=/tmp/go-cache \
+  -v "$project_dir:/src" -w /src "$image" \
+  sh -c "export PATH=/usr/local/go/bin:\$PATH
+go run -buildvcs=false ./scripts/generate-platform-icons.go '$staging_rel/icons'"
+
+# Generate architecture-specific Windows resources before cross-compilation.
+# The pinned generator is a build-time tool only.
+docker run --rm --user "$container_user" \
+  -e GOCACHE=/tmp/go-cache \
+  -v "$project_dir:/src" -w /src "$image" \
+  sh -c "export PATH=/usr/local/go/bin:\$PATH
+go run github.com/tc-hib/go-winres@v0.3.3 simply \
+  --arch amd64,arm64 \
+  --out cmd/usb-launcher/rsrc \
+  --icon '$staging_rel/icons/windows.png' \
+  --manifest cli \
+  --file-description 'OpenClaw Portable Bridge' \
+  --product-name 'OpenClaw Portable Bridge' \
+  --original-filename 'OPENCLAW BRIDGE.exe'"
 cp "$package_dir/config/bridge-public.example.json" "$staging_dir/config/bridge-public.example.json"
 if [[ -f "$package_dir/config/bridge-public.json" ]]; then
   cp "$package_dir/config/bridge-public.json" "$staging_dir/config/bridge-public.json"
@@ -137,7 +160,10 @@ go run -buildvcs=false ./cmd/release-tool \
   -filename '$client'"
 done
 
-cp "$staging_dir/launchers/windows-amd64/OPENCLAW BRIDGE.exe" "$staging_dir/OPENCLAW BRIDGE.exe"
+cp "$staging_dir/launchers/windows-amd64/OPENCLAW BRIDGE.exe" "$staging_dir/OPENCLAW BRIDGE - WINDOWS.exe"
+cp "$staging_dir/launchers/linux-amd64/OPENCLAW BRIDGE" "$staging_dir/OPENCLAW BRIDGE - LINUX.exe"
+cp "$staging_dir/launchers/darwin-arm64/OPENCLAW BRIDGE" "$staging_dir/OPENCLAW BRIDGE - MACOS.command"
+rm -f -- "$project_dir"/cmd/usb-launcher/rsrc_windows_*.syso
 rm -rf -- "$staging_dir/bin"
 
 (

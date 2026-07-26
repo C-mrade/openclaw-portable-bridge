@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.2-beta.3
+
+- Add clearly labelled root launchers for Windows, Linux, and macOS.
+- Make the native Linux x64 launcher directly executable on common VFAT
+  `showexec` mounts while retaining signed payload verification.
+- Add original platform badges and native Windows executable icon metadata.
+- Keep historical USB packages off the removable drive so its root stays
+  clean, predictable, and agent-friendly.
+
 ## 0.6.2-beta.2
 
 - Restart the broker automatically when an operator upgrade changes its binary

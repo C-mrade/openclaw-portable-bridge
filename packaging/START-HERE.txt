@@ -1,0 +1,21 @@
+OPENCLAW PORTABLE BRIDGE
+========================
+
+Choose the launcher whose name matches this computer:
+
+  Windows  -> OPENCLAW BRIDGE - WINDOWS.exe
+  Linux    -> OPENCLAW BRIDGE - LINUX.exe
+  macOS    -> OPENCLAW BRIDGE - MACOS.command
+
+The Linux file is a native Linux application. Its .exe suffix only works
+around FAT/VFAT removable-drive execute-bit limitations; it does not use Wine.
+
+If the launcher does not open when double-clicked, open a visible terminal in
+this folder and run:
+
+  Linux:  ./OPENCLAW\ BRIDGE\ -\ LINUX.exe
+  macOS:  ./OPENCLAW\ BRIDGE\ -\ MACOS.command
+
+The launcher verifies the signed payload before asking for consent. Never
+approve a session unless the comparison code matches the private approval
+conversation.

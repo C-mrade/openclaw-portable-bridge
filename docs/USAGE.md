@@ -1,9 +1,11 @@
 # Usage
 
 1. Insert the prepared USB and open its `OPENCLAW_BRIDGE` directory.
-2. On Windows, double-click `OPENCLAW BRIDGE.exe`. On Linux or macOS, run the
-   matching launcher from a visible terminal. No administrator rights are
-   required.
+2. Open the clearly labelled root launcher for Windows, Linux, or macOS. The
+   Linux convenience launcher is a native ELF file with an `.exe` suffix so
+   FAT/VFAT `showexec` mounts expose it as executable; it never uses Wine.
+   Architecture-specific launchers remain under `launchers/`. No administrator
+   rights are required.
 3. Choose **Audit** or **Developer**. Audit provides fixed,
    read-only system, network, disk, service and process inspections. It may
    also read files from one directory selected locally (use `C:\\` to grant
