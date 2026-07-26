@@ -41,6 +41,13 @@ human-approved Tailscale Funnel publication, and JSON diagnostics. OpenClaw or
 Hermes can now own the routine setup while humans retain decisions about
 public exposure, endpoint trust, identity, and session approval.
 
+The `0.6.2-beta.1` hardening slice removes clear session tokens from durable
+state, adds typed session discovery, makes bounded and sanitized
+`untrusted_guest_data` the default agent result view, and shows every command
+in the visible guest activity stream. The unrestricted Developer profile
+remains available for trusted technicians; Audit remains read-only and can be
+confined to one locally chosen directory.
+
 The broker keeps a live in-memory model that is durably mirrored and recovered;
 a future schema
 migration layer is still required before the durable format is declared

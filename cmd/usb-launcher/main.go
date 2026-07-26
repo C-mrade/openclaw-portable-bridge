@@ -77,14 +77,15 @@ func run() error {
 	}
 	fmt.Printf("OpenClaw Portable Bridge %s\nPayload verified. Temporary directory: %s\n", m.Version, stage)
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Println("Consent: [1] Information profile (read-only)  [2] Developer profile")
+	fmt.Println("Consent: [1] Audit profile (read-only, optional chosen directory)  [2] Developer profile")
 	fmt.Print("Selection [1]: ")
 	choice, _ := reader.ReadString('\n')
 	profile := "information"
 	args := []string{"-broker", cfg.BrokerURL, "-usb-id", cfg.USBID, "-profile", profile}
 	if strings.TrimSpace(choice) == "2" {
 		profile = "developer"
-		fmt.Println("WARNING: Developer enables terminal and file access across all locations available to this user.")
+		fmt.Println("WARNING: Developer gives the approved technician full user-level terminal and file access across all mounted volumes.")
+		fmt.Println("Use it only for an operator you trust. Every Bridge command remains visible here and the session can be stopped at any time.")
 		if runtime.GOOS == "windows" {
 			fmt.Println("Administrator commands display a normal local Windows UAC prompt each time.")
 		} else {
@@ -107,7 +108,7 @@ func run() error {
 			args = append(args, "-allow-dir", "/")
 		}
 	} else {
-		fmt.Println("Information profile: system/network/disk/service inventory with optional read-only file access.")
+		fmt.Println("Audit profile: fixed system/network/disk/service inventory with optional read-only file access.")
 		fmt.Print("Readable directory (ENTER for no file access): ")
 		readRoot, _ := reader.ReadString('\n')
 		readRoot = strings.TrimSpace(readRoot)

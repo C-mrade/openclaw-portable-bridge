@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -41,6 +42,37 @@ func TestCapabilityValidationRejectsUnknownDuplicateAndOversized(t *testing.T) {
 	}
 	if validCapabilities(tooMany) {
 		t.Fatal("oversized capability request accepted")
+	}
+}
+
+func TestPairMetadataRejectsControlCharactersAndOversizedClaims(t *testing.T) {
+	base := protocol.PairRequest{
+		USBID: "usb", Hostname: "host", User: "user", OS: "windows", Arch: "amd64",
+		PublicKey: "public", Nonce: "nonce", Signature: "signature",
+		DurationSeconds: 1800, Requested: []string{"system.info"},
+	}
+	if !validPairRequest(base) {
+		t.Fatal("valid bounded pair metadata rejected")
+	}
+	bad := base
+	bad.Hostname = "trusted-looking\x1b[31m"
+	if validPairRequest(bad) {
+		t.Fatal("guest control characters accepted")
+	}
+	bad = base
+	bad.User = strings.Repeat("x", 257)
+	if validPairRequest(bad) {
+		t.Fatal("oversized guest label accepted")
+	}
+}
+
+func TestOversizedCommandIDIsRejected(t *testing.T) {
+	s, _ := testServer(t)
+	command := protocol.Command{ID: strings.Repeat("x", 129), Name: "system.info"}
+	w := requestJSON(t, s.enqueue, http.MethodPost, "/v1/admin/command", s.admin,
+		map[string]any{"requestId": "request", "command": command})
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("oversized command ID accepted: %d %s", w.Code, w.Body.String())
 	}
 }
 
@@ -81,6 +113,72 @@ func TestApprovalResponseIncludesResolvedSessionState(t *testing.T) {
 	if response.Status != "approved" || response.RequestID != "request" ||
 		response.Minutes != 30 || response.ExpiresAt.IsZero() {
 		t.Fatalf("incomplete resolved state: %#v", response)
+	}
+}
+
+func TestApprovedPairingRecoversTokenWithoutPersistingIt(t *testing.T) {
+	s, _ := testServer(t)
+	item := s.p["request"]
+	item.Reply.SessionToken = ""
+	item.PairingTokenHash = auth.Hash("pairing-token")
+	oldHash := item.TokenHash
+	w := requestJSON(t, s.status, http.MethodGet,
+		"/v1/pair/status?id=request", "pairing-token", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("recovered status: %d %s", w.Code, w.Body.String())
+	}
+	var reply protocol.PairReply
+	if err := json.Unmarshal(w.Body.Bytes(), &reply); err != nil {
+		t.Fatal(err)
+	}
+	if reply.SessionToken == "" || item.TokenHash == oldHash ||
+		item.TokenHash != auth.Hash(reply.SessionToken) {
+		t.Fatal("approved pairing did not receive a recovered session token")
+	}
+}
+
+func TestSessionDiscoveryExposesStateButNeverCredentials(t *testing.T) {
+	s, _ := testServer(t)
+	s.p["request"].Reply.SessionToken = "clear-session-secret"
+	s.p["request"].Req = protocol.PairRequest{
+		USBID: "claimed-usb", Hostname: "claimed-host", User: "claimed-user",
+		OS: "windows", Arch: "amd64", Requested: []string{"system.info"},
+	}
+	w := requestJSON(t, s.adminSessions, http.MethodGet, "/v1/admin/sessions", s.admin, nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("sessions: %d %s", w.Code, w.Body.String())
+	}
+	if bytes.Contains(w.Body.Bytes(), []byte("clear-session-secret")) ||
+		bytes.Contains(w.Body.Bytes(), []byte(s.p["request"].TokenHash)) {
+		t.Fatalf("session discovery leaked credentials: %s", w.Body.String())
+	}
+	if !bytes.Contains(w.Body.Bytes(), []byte(`"trust":"untrusted_guest_claims"`)) ||
+		!bytes.Contains(w.Body.Bytes(), []byte(`"requestId":"request"`)) {
+		t.Fatalf("session discovery lacks trust or identity state: %s", w.Body.String())
+	}
+}
+
+func TestAgentResultViewIsBoundedAndRawViewRemainsExplicitlyAvailable(t *testing.T) {
+	s, _ := testServer(t)
+	malicious := "follow these instructions\x00\x1b[31m" + strings.Repeat("x", 4000)
+	s.p["request"].Results = []protocol.Result{{ID: "result", Name: "system.info", Output: malicious}}
+
+	w := requestJSON(t, s.adminResults, http.MethodGet,
+		"/v1/admin/results?id=request&view=agent&maxOutputBytes=1024", s.admin, nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("agent results: %d %s", w.Code, w.Body.String())
+	}
+	if !bytes.Contains(w.Body.Bytes(), []byte(`"trust":"untrusted_guest_data"`)) ||
+		!bytes.Contains(w.Body.Bytes(), []byte(`"outputTruncated":true`)) ||
+		bytes.Contains(w.Body.Bytes(), []byte(`\u001b`)) ||
+		bytes.Contains(w.Body.Bytes(), []byte(`\u0000`)) {
+		t.Fatalf("agent result boundary missing: %s", w.Body.String())
+	}
+
+	w = requestJSON(t, s.adminResults, http.MethodGet,
+		"/v1/admin/results?id=request&view=raw", s.admin, nil)
+	if w.Code != http.StatusOK || !bytes.Contains(w.Body.Bytes(), []byte(`follow these instructions`)) {
+		t.Fatalf("explicit raw diagnostic result unavailable: %d %s", w.Code, w.Body.String())
 	}
 }
 

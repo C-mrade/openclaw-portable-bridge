@@ -40,6 +40,19 @@ Exit gate: an OpenClaw or Hermes agent can take a clean supported Linux host
 from clone to a verified signed package, asking the human only to approve a new
 HTTPS trust/publication boundary and other genuinely sensitive actions.
 
+### M1.2 — hostile guest boundary (`0.6.2`)
+
+- Never persist clear session tokens while preserving restart recovery.
+- Provide credential-free session discovery and command-state summaries.
+- Mark, sanitize, hash, and bound guest results before they reach an agent.
+- Preserve an explicit raw diagnostic path without making it the default.
+- Show every received capability in the visible guest activity stream.
+- Keep full Developer freedom while making the read-only Audit path clear.
+
+Exit gate: a technician retains complete approved control, while a malicious
+guest cannot silently turn bulk output into unbounded trusted agent input or
+recover reusable operator credentials from portable media or broker state.
+
 ## M2 — trustworthy guest experience (`0.7`)
 
 - Replace the console with a native, dependency-free guest window and tray

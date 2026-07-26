@@ -24,8 +24,38 @@ func TestMCPListsNarrowBridgeTools(t *testing.T) {
 	if !scanner.Scan() || !strings.Contains(scanner.Text(), `"openclaw-portable-bridge"`) {
 		t.Fatalf("missing initialize response: %s", output.String())
 	}
-	if !scanner.Scan() || !strings.Contains(scanner.Text(), `"bridge_approve"`) || strings.Contains(scanner.Text(), `"admin_token"`) {
+	if !scanner.Scan() || !strings.Contains(scanner.Text(), `"bridge_approve"`) ||
+		!strings.Contains(scanner.Text(), `"bridge_list_sessions"`) ||
+		strings.Contains(scanner.Text(), `"admin_token"`) {
 		t.Fatalf("unsafe or incomplete tool list: %s", scanner.Text())
+	}
+}
+
+func TestMCPResultsAlwaysRequestAgentSafeView(t *testing.T) {
+	token := strings.Repeat("c", 32)
+	broker := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer "+token {
+			t.Fatal("missing protected broker credential")
+		}
+		if r.URL.Path != "/v1/admin/results" ||
+			r.URL.Query().Get("view") != "agent" ||
+			r.URL.Query().Get("maxOutputBytes") != "4096" {
+			t.Fatalf("unsafe result request: %s", r.URL.String())
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"trust": "untrusted_guest_data", "results": []any{},
+		})
+	}))
+	defer broker.Close()
+	s := &server{baseURL: broker.URL, token: token, http: broker.Client()}
+	result, err := s.callTool("bridge_results", map[string]any{
+		"request_id": "request", "max_output_bytes": 4096,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(result), "untrusted_guest_data") {
+		t.Fatalf("missing safe guest envelope: %s", result)
 	}
 }
 

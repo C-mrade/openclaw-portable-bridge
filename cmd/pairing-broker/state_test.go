@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,7 +17,7 @@ func TestStateStoreRecoversLeasesWithoutReplayingRunningCommands(t *testing.T) {
 	store := &stateStore{path: path}
 	entries := map[string]*pending{
 		"request": {
-			Reply:     protocol.PairReply{Status: "approved", ExpiresAt: now.Add(time.Hour)},
+			Reply:     protocol.PairReply{Status: "approved", SessionToken: "must-never-reach-disk", ExpiresAt: now.Add(time.Hour)},
 			TokenHash: auth.Hash("session"),
 			CreatedAt: now,
 			Commands: map[string]*commandState{
@@ -30,11 +31,22 @@ func TestStateStoreRecoversLeasesWithoutReplayingRunningCommands(t *testing.T) {
 	if err := store.save(entries); err != nil {
 		t.Fatal(err)
 	}
+	onDisk, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(onDisk, []byte("must-never-reach-disk")) ||
+		bytes.Contains(onDisk, []byte(`"SessionToken"`)) {
+		t.Fatalf("clear session token persisted: %s", onDisk)
+	}
 	_, recovered, err := openStateStore(path, now.Add(time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
 	got := recovered["request"]
+	if got.Reply.SessionToken != "" {
+		t.Fatal("clear session token recovered into memory")
+	}
 	if got.Commands["leased"].Status != "queued" {
 		t.Fatalf("leased command recovered as %q", got.Commands["leased"].Status)
 	}

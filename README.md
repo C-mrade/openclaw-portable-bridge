@@ -35,6 +35,12 @@ system protections, or expose an OpenClaw Gateway token. Administrator
 execution is never automatic: Developer mode must be confirmed locally and,
 on Windows, each elevated command requires a separate UAC approval.
 
+Agent-facing results are treated as hostile input: default MCP and operator
+views remove terminal control characters, bound inline output, attach byte
+count and SHA-256 metadata, and explicitly label guest claims untrusted. This
+limits context flooding and prompt-injection exposure without reducing the
+technician's explicitly approved Developer capabilities.
+
 ## Platform support
 
 | Platform | Build | Runtime validation | Elevation |
@@ -126,7 +132,7 @@ public key before building the Windows package:
 go run ./cmd/release-tool -mode keygen -key /secure/path/release.key
 export BRIDGE_RELEASE_KEY_FILE=/secure/path/release.key
 export BRIDGE_RELEASE_PUBLIC_KEY='<public-key-printed-by-keygen>'
-./scripts/build-release.sh 0.6.0-beta.1
+./scripts/build-release.sh 0.6.2-beta.1
 ```
 
 Copy `packaging/usb/config/bridge-public.example.json` to

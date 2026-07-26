@@ -10,9 +10,12 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/C-mrade/openclaw-portable-bridge/internal/audit"
 	"github.com/C-mrade/openclaw-portable-bridge/internal/auth"
@@ -81,7 +84,7 @@ func (s *server) pair(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	if q.USBID == "" || q.DurationSeconds < 60 || q.DurationSeconds > 3600 || !validCapabilities(q.Requested) || !auth.Verify(q.PublicKey, q.Signature, protocol.CanonicalPairRequest(q)) {
+	if !validPairRequest(q) || !auth.Verify(q.PublicKey, q.Signature, protocol.CanonicalPairRequest(q)) {
 		write(w, 403, map[string]string{"error": "request rejected"})
 		return
 	}
@@ -147,6 +150,26 @@ func (s *server) status(w http.ResponseWriter, r *http.Request) {
 	if x == nil || subtle.ConstantTimeCompare([]byte(x.PairingTokenHash), []byte(auth.Hash(pollToken))) != 1 {
 		write(w, 404, nil)
 		return
+	}
+	if x.Reply.Status == "approved" && x.Reply.SessionToken == "" &&
+		time.Now().Before(x.Reply.ExpiresAt) {
+		// Clear session tokens are intentionally absent from durable state.
+		// If approval was persisted but the guest had not collected its token
+		// before a restart, issue a replacement and persist only its hash.
+		token, err := auth.Token()
+		if err != nil {
+			write(w, 500, map[string]string{"error": "session token unavailable"})
+			return
+		}
+		previousHash := x.TokenHash
+		x.TokenHash = auth.Hash(token)
+		x.Reply.SessionToken = token
+		if err := s.state.save(s.p); err != nil {
+			x.TokenHash = previousHash
+			x.Reply.SessionToken = ""
+			write(w, 500, map[string]string{"error": "state unavailable"})
+			return
+		}
 	}
 	reply := x.Reply
 	reply.PairingToken = ""
@@ -260,7 +283,8 @@ func (s *server) enqueue(w http.ResponseWriter, r *http.Request) {
 	if q.Command.Name == "files.write-chunk" {
 		maxParams = 2 << 20
 	}
-	if q.Command.ID == "" || !contains(s.capabilities(q.RequestID), q.Command.Name) || len(q.Command.Params) > maxParams {
+	if q.Command.ID == "" || len(q.Command.ID) > 128 ||
+		!contains(s.capabilities(q.RequestID), q.Command.Name) || len(q.Command.Params) > maxParams {
 		write(w, 403, map[string]string{"error": "command not authorized"})
 		return
 	}
@@ -428,6 +452,68 @@ func (s *server) adminPending(w http.ResponseWriter, r *http.Request) {
 	write(w, 200, items)
 }
 
+type sessionView struct {
+	RequestID       string         `json:"requestId"`
+	Status          string         `json:"status"`
+	Trust           string         `json:"trust"`
+	USBID           string         `json:"usbId"`
+	Hostname        string         `json:"hostname"`
+	OS              string         `json:"os"`
+	Arch            string         `json:"arch"`
+	User            string         `json:"user"`
+	Requested       []string       `json:"requested"`
+	CreatedAt       time.Time      `json:"createdAt"`
+	ExpiresAt       time.Time      `json:"expiresAt,omitempty"`
+	QueueDepth      int            `json:"queueDepth"`
+	ResultCount     int            `json:"resultCount"`
+	CommandStatuses map[string]int `json:"commandStatuses"`
+}
+
+func (s *server) adminSessions(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdmin(r) {
+		write(w, 401, nil)
+		return
+	}
+	requestID := r.URL.Query().Get("id")
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	items := make([]sessionView, 0, len(s.p))
+	for id, item := range s.p {
+		if requestID != "" && id != requestID {
+			continue
+		}
+		statuses := map[string]int{}
+		for _, command := range item.Commands {
+			if command != nil {
+				statuses[command.Status]++
+			}
+		}
+		status := item.Reply.Status
+		if status == "approved" && !time.Now().Before(item.Reply.ExpiresAt) {
+			status = "expired"
+		}
+		items = append(items, sessionView{
+			RequestID: id, Status: status, Trust: "untrusted_guest_claims",
+			USBID: item.Req.USBID, Hostname: item.Req.Hostname, OS: item.Req.OS,
+			Arch: item.Req.Arch, User: item.Req.User,
+			Requested: append([]string(nil), item.Req.Requested...),
+			CreatedAt: item.CreatedAt, ExpiresAt: item.Reply.ExpiresAt,
+			QueueDepth: len(item.Queue), ResultCount: len(item.Results),
+			CommandStatuses: statuses,
+		})
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].CreatedAt.Before(items[j].CreatedAt) })
+	if requestID != "" && len(items) == 0 {
+		write(w, 404, map[string]string{"error": "session not found"})
+		return
+	}
+	write(w, 200, map[string]any{
+		"trust":    "untrusted_guest_claims",
+		"notice":   "Hostname, user, platform, and USB ID are descriptive guest claims, not verified identity.",
+		"sessions": items,
+	})
+}
+
 func (s *server) adminReject(w http.ResponseWriter, r *http.Request) {
 	if !s.isAdmin(r) {
 		write(w, 401, nil)
@@ -465,6 +551,15 @@ func (s *server) adminResults(w http.ResponseWriter, r *http.Request) {
 			write(w, 500, map[string]string{"error": "state unavailable"})
 			return
 		}
+	}
+	if r.URL.Query().Get("view") == "agent" {
+		maxOutput := 16 << 10
+		if requested, err := strconv.Atoi(r.URL.Query().Get("maxOutputBytes")); err == nil &&
+			requested >= 1024 && requested <= 64<<10 {
+			maxOutput = requested
+		}
+		write(w, 200, agentResultEnvelope(results, maxOutput))
+		return
 	}
 	write(w, 200, results)
 }
@@ -616,6 +711,38 @@ func validCapabilities(v []string) bool {
 	}
 	return true
 }
+
+func validPairRequest(q protocol.PairRequest) bool {
+	if q.DurationSeconds < 60 || q.DurationSeconds > 3600 ||
+		!validGuestLabel(q.USBID, 128) ||
+		!validGuestLabel(q.Hostname, 255) ||
+		!validGuestLabel(q.User, 256) ||
+		!validGuestLabel(q.OS, 32) ||
+		!validGuestLabel(q.Arch, 32) ||
+		len(q.PublicKey) == 0 || len(q.PublicKey) > 128 ||
+		len(q.Nonce) == 0 || len(q.Nonce) > 128 ||
+		len(q.Signature) == 0 || len(q.Signature) > 256 {
+		return false
+	}
+	return validCapabilities(q.Requested)
+}
+
+func validGuestLabel(value string, maxRunes int) bool {
+	if value == "" {
+		return false
+	}
+	count := 0
+	for _, r := range strings.ToValidUTF8(value, "\uFFFD") {
+		if r == '\uFFFD' || unicode.IsControl(r) {
+			return false
+		}
+		count++
+		if count > maxRunes {
+			return false
+		}
+	}
+	return true
+}
 func contains(v []string, s string) bool {
 	for _, x := range v {
 		if x == s {
@@ -692,6 +819,7 @@ func main() {
 	http.HandleFunc("/v1/pair/status", s.status)
 	http.HandleFunc("/v1/admin/approve", s.approve)
 	http.HandleFunc("/v1/admin/pending", s.adminPending)
+	http.HandleFunc("/v1/admin/sessions", s.adminSessions)
 	http.HandleFunc("/v1/admin/reject", s.adminReject)
 	http.HandleFunc("/v1/admin/command", s.enqueue)
 	http.HandleFunc("/v1/admin/revoke", s.adminRevoke)

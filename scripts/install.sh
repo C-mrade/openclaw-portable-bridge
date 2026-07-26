@@ -7,7 +7,7 @@ config_root="${XDG_CONFIG_HOME:-$HOME/.config}/openclaw-portable-bridge"
 signing_dir="$config_root/signing"
 env_file="$project_dir/.env"
 public_config="$project_dir/packaging/usb/config/bridge-public.json"
-version="${BRIDGE_VERSION:-0.6.0-beta.1}"
+version="${BRIDGE_VERSION:-0.6.2-beta.1}"
 broker_public_url="${BRIDGE_PUBLIC_URL:-}"
 approval_target="${BRIDGE_APPROVAL_TARGET:-}"
 approver_ids="${BRIDGE_APPROVER_IDS:-}"
@@ -27,7 +27,7 @@ Options:
   --approver-ids ID[,ID...]    Allowed Telegram sender IDs
   --agent auto|openclaw|hermes|both|none
   --usb-dir DIRECTORY          Prepare DIRECTORY/OPENCLAW_BRIDGE after build
-  --version VERSION            Release version (default: 0.6.0-beta.1)
+  --version VERSION            Release version (default: 0.6.2-beta.1)
   --non-interactive            Fail instead of prompting for missing values
   -h, --help                   Show this help
 

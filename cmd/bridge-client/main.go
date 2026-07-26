@@ -17,6 +17,7 @@ import (
 	"os/signal"
 	"os/user"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -43,6 +44,51 @@ func capabilities(p string) []string {
 		return []string{"system.info", "session.disconnect"}
 	}
 	return nil
+}
+
+func commandSummary(cmd protocol.Command) string {
+	summary := fmt.Sprintf("id=%s capability=%s", printable(cmd.ID, 96), printable(cmd.Name, 64))
+	var params struct {
+		Command string `json:"command"`
+		Script  string `json:"script"`
+		Path    string `json:"path"`
+		JobID   string `json:"jobId"`
+		PID     int    `json:"pid"`
+	}
+	if json.Unmarshal(cmd.Params, &params) != nil {
+		return summary
+	}
+	switch {
+	case params.Path != "":
+		return summary + " path=" + printable(params.Path, 260)
+	case params.JobID != "":
+		return summary + " job=" + printable(params.JobID, 96)
+	case params.PID != 0:
+		return fmt.Sprintf("%s pid=%d", summary, params.PID)
+	case params.Command != "":
+		return summary + " command=" + printable(params.Command, 512)
+	case params.Script != "":
+		return summary + " script=" + printable(params.Script, 512)
+	default:
+		return summary
+	}
+}
+
+func printable(value string, limit int) string {
+	value = strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\r' || r == '\t' {
+			return ' '
+		}
+		if r < 0x20 {
+			return -1
+		}
+		return r
+	}, strings.ToValidUTF8(value, "\uFFFD"))
+	runes := []rune(value)
+	if len(runes) > limit {
+		value = string(runes[:limit]) + "…"
+	}
+	return value
 }
 func call(method, url, token string, in, out any) error {
 	var b bytes.Buffer
@@ -173,19 +219,7 @@ func main() {
 			continue
 		}
 		start := time.Now()
-		if cmd.Name == "shell.run" || cmd.Name == "shell.run-admin" || cmd.Name == "powershell.run" || cmd.Name == "shell.start" {
-			var shown struct {
-				Command string `json:"command"`
-				Script  string `json:"script"`
-			}
-			if json.Unmarshal(cmd.Params, &shown) == nil {
-				detail := shown.Command
-				if detail == "" {
-					detail = shown.Script
-				}
-				fmt.Printf("[%s] COMMAND RECEIVED (%s): %s\n", start.Format(time.RFC3339), cmd.Name, detail)
-			}
-		}
+		fmt.Printf("[%s] COMMAND RECEIVED: %s\n", start.Format(time.RFC3339), commandSummary(cmd))
 		output, runErr := local.Execute(cmd)
 		res := protocol.Result{ID: cmd.ID, Name: cmd.Name, StartedAt: start, FinishedAt: time.Now(), Output: output}
 		if runErr != nil {

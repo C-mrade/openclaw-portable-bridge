@@ -11,10 +11,17 @@
 - Canonical signing-key discovery plus a full `0.6.0-beta.1` six-target build
   under a rotated trust root, with key-pair and complete checksum verification.
 - Atomic broker-state snapshots with restrictive permissions.
+- Clear session tokens excluded from durable snapshots, with approval-token
+  recovery after restart and established-session authentication by hash.
 - Restart recovery requeues unacknowledged leases without replaying commands
   already acknowledged as running.
 - Corrupt or incompatible state fails closed.
 - MCP tool calls keep the administrator token inside the local adapter.
+- MCP result retrieval always requests the bounded `untrusted_guest_data`
+  view; malicious control characters, oversized output, integrity metadata,
+  and explicit raw fallback have regression coverage.
+- Credential-free active-session discovery exposes capabilities, expiry,
+  queue depth, and command-state counts without token/hash disclosure.
 - OpenClaw proactive approval delivery through the existing private
   conversation, with idempotent notification markers written only after
   successful delivery.
@@ -45,14 +52,20 @@
   transfer with final SHA-256, asynchronous process-tree cancellation, queue
   saturation/backpressure, survival across multiple idle long-poll cycles,
   cleanup, and explicit disconnect/revocation.
+- Windows x64 live technician audit on `STANPC`: typed system, network, disk,
+  service and process inspection; non-elevated shell and PowerShell; visible
+  scoped/full-volume filesystem behavior; immediate revocation and confirmed
+  post-revoke rejection.
+- Clean `0.6.2-beta.1` agent-first bootstrap, signed six-target package,
+  checksum inventory, diagnostics, and idempotent second apply.
 
 ## Deferred
 
 - Native Windows GUI/tray and per-command approval dialog.
 - Equivalent proactive approval/callback adapters for Hermes and agents other
   than OpenClaw Telegram.
-- Full live approval matrix: reject, timeout, duplicate callback, broker
-  restart, revoke, and transport loss.
+- Remaining live approval cases: untouched-request timeout and duplicate
+  callback delivery.
 - Authenticode signing.
 - Restrictive-network test matrix and HTTPS-port fallback.
 - Forced termination, USB removal, junction abuse, large-transfer, output

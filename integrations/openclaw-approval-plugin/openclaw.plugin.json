@@ -2,7 +2,7 @@
   "id": "portable-bridge-approval",
   "name": "Portable Bridge Approval",
   "description": "Handle Portable Bridge Telegram approvals outside the agent queue.",
-  "version": "0.6.0-beta.1",
+  "version": "0.6.2-beta.1",
   "activation": {
     "onStartup": true
   },

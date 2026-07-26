@@ -4,7 +4,7 @@
 2. On Windows, double-click `OPENCLAW BRIDGE.exe`. On Linux or macOS, run the
    matching launcher from a visible terminal. No administrator rights are
    required.
-3. Choose **Information** or **Developer**. Information provides fixed,
+3. Choose **Audit** or **Developer**. Audit provides fixed,
    read-only system, network, disk, service and process inspections. It may
    also read files from one directory selected locally (use `C:\\` to grant
    the whole system volume). Developer requires typing `DEVELOPER`, grants
@@ -22,6 +22,11 @@ Developer automation can use `shell.start`, `shell.status`, and `shell.cancel`
 for long-running cancellable jobs. Large files can be transferred through
 `files.read-chunk` and `files.write-chunk`; final writes require the expected
 whole-file SHA-256. Directory listings accept `offset`, `limit`, and `filter`.
+
+Every received capability is shown in the guest activity stream, while bulk
+transfer payloads are never printed. Developer intentionally retains complete
+user-level freedom for the approved technician; use Audit when broad shell and
+filesystem access are unnecessary.
 
 Configure your own HTTPS broker endpoint in `bridge-public.json`. Expose only
 the loopback pairing broker through a hardened TLS reverse proxy or Tailscale

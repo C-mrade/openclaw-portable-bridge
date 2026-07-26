@@ -10,6 +10,8 @@ Send `Authorization: Bearer <admin-token>` and JSON bodies.
 
 - `POST /v1/admin/approve`: `{"requestId":"…","minutes":20}`
 - `GET /v1/admin/pending`
+- `GET /v1/admin/sessions`
+- `GET /v1/admin/sessions?id=<request-id>`
 - `POST /v1/admin/reject`: `{"requestId":"…"}`
 - `POST /v1/admin/command`: `{"requestId":"…","command":{…}}`
 - `GET /v1/admin/results?id=<request-id>&consume=true`
@@ -41,10 +43,17 @@ name.
 Use `shell.start`, `shell.status`, and `shell.cancel` for long-running commands.
 Use chunked file operations for larger transfers and verify the final SHA-256.
 
+Agent adapters must request
+`/v1/admin/results?...&view=agent&maxOutputBytes=16384`. This view removes
+terminal control characters, bounds inline output, includes byte count and
+SHA-256, and labels results `untrusted_guest_data`. The raw view is only for
+explicit human diagnostics and must never be treated as instructions.
+
 ## Adapter design
 
-Expose typed tools such as `list_pending`, `approve`, `reject`, `command`,
-`results`, and `revoke`. Keep secrets server-side, validate every argument,
+Expose typed tools such as `list_pending`, `list_sessions`, `describe_session`,
+`approve`, `reject`, `command`, `results`, and `revoke`. Keep secrets
+server-side, validate every argument,
 redact tokens from logs, bind request IDs to the approving conversation, and
 make result consumption explicit. Do not expose a generic unauthenticated HTTP
 proxy to the model.

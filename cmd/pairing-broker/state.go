@@ -52,6 +52,9 @@ func recoverState(entries map[string]*pending, now time.Time) {
 			delete(entries, id)
 			continue
 		}
+		// The clear session token is delivered once to the guest and is never
+		// needed for recovery. Authentication uses only TokenHash.
+		item.Reply.SessionToken = ""
 		queued := make([]string, 0, len(item.Commands))
 		alreadyQueued := make(map[string]bool, len(item.Queue))
 		for _, commandID := range item.Queue {
@@ -78,7 +81,17 @@ func (s *stateStore) save(entries map[string]*pending) error {
 	if s == nil || s.path == "" {
 		return nil
 	}
-	data, err := json.MarshalIndent(persistentState{Version: stateVersion, Pending: entries}, "", "  ")
+	safeEntries := make(map[string]*pending, len(entries))
+	for id, item := range entries {
+		if item == nil {
+			safeEntries[id] = nil
+			continue
+		}
+		copyItem := *item
+		copyItem.Reply.SessionToken = ""
+		safeEntries[id] = &copyItem
+	}
+	data, err := json.MarshalIndent(persistentState{Version: stateVersion, Pending: safeEntries}, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode broker state: %w", err)
 	}

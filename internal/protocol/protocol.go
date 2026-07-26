@@ -18,8 +18,9 @@ type PairRequest struct {
 	DurationSeconds                                              int64    `json:"durationSeconds"`
 }
 type PairReply struct {
-	RequestID, Status, CompareCode, PairingToken, SessionToken, Error string
-	ExpiresAt                                                         time.Time
+	RequestID, Status, CompareCode, PairingToken, Error string
+	SessionToken                                        string `json:"SessionToken,omitempty"`
+	ExpiresAt                                           time.Time
 }
 type Command struct {
 	ID, Name string

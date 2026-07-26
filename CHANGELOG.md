@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.2-beta.1
+
+- Removed clear session tokens from durable broker snapshots without losing
+  approval/restart recovery.
+- Added safe `sessions` and `describe` discovery to the broker, CLI, and MCP.
+- Made bounded, control-character-sanitized, SHA-256-labelled
+  `untrusted_guest_data` the default result view for agents.
+- Added a 256 KiB aggregate agent-output budget and bounded guest labels and
+  command identifiers.
+- Kept full raw results behind an explicit CLI `--raw` diagnostic option.
+- Added a visible summary for every capability received by the guest.
+- Clarified the read-only Audit and unrestricted Developer consent paths.
+
 ## 0.6.1-beta.1
 
 - Added `bridge-bootstrap.sh` as the agent-facing discovery, plan, apply, and

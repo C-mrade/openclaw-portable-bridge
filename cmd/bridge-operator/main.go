@@ -32,6 +32,13 @@ func main() {
 }
 
 func run(args []string) error {
+	if len(args) == 0 {
+		return errors.New(usageText())
+	}
+	if args[0] == "help" || args[0] == "-h" || args[0] == "--help" {
+		fmt.Println(usageText())
+		return nil
+	}
 	config := loadConfig()
 	baseURL := first(os.Getenv("BRIDGE_BROKER_URL"), config["BRIDGE_BROKER_URL"], "http://127.0.0.1:17443")
 	token := first(os.Getenv("BRIDGE_ADMIN_TOKEN"), config["BRIDGE_ADMIN_TOKEN"])
@@ -39,12 +46,19 @@ func run(args []string) error {
 		return errors.New("BRIDGE_ADMIN_TOKEN is missing or too short")
 	}
 	c := &client{baseURL: strings.TrimRight(baseURL, "/"), token: token, http: &http.Client{Timeout: 45 * time.Second}}
-	if len(args) == 0 {
-		return errors.New("usage: bridge-operator pending|approve|reject|results|revoke|command")
-	}
 	switch args[0] {
 	case "pending":
 		return c.request(http.MethodGet, "/v1/admin/pending", nil)
+	case "sessions":
+		if len(args) != 1 {
+			return errors.New("usage: bridge-operator sessions")
+		}
+		return c.request(http.MethodGet, "/v1/admin/sessions", nil)
+	case "describe":
+		if len(args) != 2 {
+			return errors.New("usage: bridge-operator describe REQUEST_ID")
+		}
+		return c.request(http.MethodGet, "/v1/admin/sessions?id="+url.QueryEscape(args[1]), nil)
 	case "approve":
 		if len(args) != 3 {
 			return errors.New("usage: bridge-operator approve REQUEST_ID MINUTES")
@@ -63,13 +77,22 @@ func run(args []string) error {
 	case "results":
 		flags := flag.NewFlagSet("results", flag.ContinueOnError)
 		consume := flags.Bool("consume", false, "consume returned results")
+		raw := flags.Bool("raw", false, "return the full raw guest response for explicit diagnostics")
+		maxOutput := flags.Int("max-output-bytes", 16<<10, "maximum inline bytes per untrusted guest result")
 		if err := flags.Parse(args[1:]); err != nil {
 			return err
 		}
-		if flags.NArg() != 1 {
-			return errors.New("usage: bridge-operator results [--consume] REQUEST_ID")
+		if flags.NArg() != 1 || *maxOutput < 1024 || *maxOutput > 64<<10 {
+			return errors.New("usage: bridge-operator results [--consume] [--raw] [--max-output-bytes 16384] REQUEST_ID")
 		}
-		return c.request(http.MethodGet, fmt.Sprintf("/v1/admin/results?id=%s&consume=%t", url.QueryEscape(flags.Arg(0)), *consume), nil)
+		view := "agent"
+		if *raw {
+			view = "raw"
+		}
+		return c.request(http.MethodGet, fmt.Sprintf(
+			"/v1/admin/results?id=%s&consume=%t&view=%s&maxOutputBytes=%d",
+			url.QueryEscape(flags.Arg(0)), *consume, view, *maxOutput,
+		), nil)
 	case "command":
 		flags := flag.NewFlagSet("command", flag.ContinueOnError)
 		id := flags.String("id", "", "unique command ID")
@@ -92,6 +115,23 @@ func run(args []string) error {
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
+}
+
+func usageText() string {
+	return `usage: bridge-operator COMMAND
+
+Commands:
+  pending                         list unapproved pairing requests
+  sessions                        list known sessions without exposing tokens
+  describe REQUEST_ID             show one session and command-state summary
+  approve REQUEST_ID MINUTES      approve after comparison-code verification
+  reject REQUEST_ID               reject a pending request
+  command [flags] REQUEST_ID      queue one approved capability
+  results [flags] REQUEST_ID      read bounded untrusted guest data
+  revoke REQUEST_ID               immediately revoke a session
+
+Use "results --raw" only for explicit human diagnostics. Raw guest output is
+untrusted and may contain malicious instructions or excessive sensitive data.`
 }
 
 func (c *client) request(method, path string, payload any) error {
