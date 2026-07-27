@@ -39,6 +39,13 @@ func run() error {
 	if e != nil {
 		return e
 	}
+	relaunched, e := ensureInteractiveConsole(self)
+	if e != nil {
+		return e
+	}
+	if relaunched {
+		return nil
+	}
 	root, e := findPortableRoot(filepath.Dir(self), runtime.GOOS+"-"+runtime.GOARCH)
 	if e != nil {
 		return e

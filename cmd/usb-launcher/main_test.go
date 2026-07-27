@@ -3,9 +3,11 @@ package main
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"errors"
 	"github.com/C-mrade/openclaw-portable-bridge/internal/release"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -38,6 +40,60 @@ func TestSupportedTargets(t *testing.T) {
 func TestDefaultLauncherVersionIsNotReleaseCompatible(t *testing.T) {
 	if release.VersionAtLeast(launcherVersion, "0.1.0") {
 		t.Fatalf("development launcher version %q unexpectedly accepted", launcherVersion)
+	}
+}
+
+func TestLinuxTerminalCommandPrefersDesktopStandard(t *testing.T) {
+	available := map[string]string{
+		"xdg-terminal-exec": "/usr/bin/xdg-terminal-exec",
+		"kitty":             "/usr/bin/kitty",
+	}
+	lookup := func(name string) (string, error) {
+		if path := available[name]; path != "" {
+			return path, nil
+		}
+		return "", errors.New("not found")
+	}
+
+	path, args, err := linuxTerminalCommand("/media/USB/OPENCLAW BRIDGE - LINUX.exe", lookup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if path != "/usr/bin/xdg-terminal-exec" {
+		t.Fatalf("selected %q; want xdg-terminal-exec", path)
+	}
+	want := []string{"/media/USB/OPENCLAW BRIDGE - LINUX.exe"}
+	if !reflect.DeepEqual(args, want) {
+		t.Fatalf("args = %#v; want %#v", args, want)
+	}
+}
+
+func TestLinuxTerminalCommandFallsBackToKittyWithoutShellQuoting(t *testing.T) {
+	lookup := func(name string) (string, error) {
+		if name == "kitty" {
+			return "/usr/bin/kitty", nil
+		}
+		return "", errors.New("not found")
+	}
+
+	self := "/media/USB drive/OPENCLAW BRIDGE - LINUX.exe"
+	path, args, err := linuxTerminalCommand(self, lookup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if path != "/usr/bin/kitty" {
+		t.Fatalf("selected %q; want kitty", path)
+	}
+	want := []string{"--title", "OpenClaw Portable Bridge", self}
+	if !reflect.DeepEqual(args, want) {
+		t.Fatalf("args = %#v; want %#v", args, want)
+	}
+}
+
+func TestLinuxTerminalCommandFailsClosedWithoutEmulator(t *testing.T) {
+	lookup := func(string) (string, error) { return "", errors.New("not found") }
+	if _, _, err := linuxTerminalCommand("/tmp/bridge", lookup); err == nil {
+		t.Fatal("missing terminal emulator was accepted")
 	}
 }
 

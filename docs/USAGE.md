@@ -4,6 +4,11 @@
 2. Open the clearly labelled root launcher for Windows, Linux, or macOS. The
    Linux convenience launcher is a native ELF file with an `.exe` suffix so
    FAT/VFAT `showexec` mounts expose it as executable; it never uses Wine.
+   When started from a graphical file manager, the Linux launcher opens a
+   supported terminal emulator automatically instead of silently reading EOF
+   and falling back to Audit. It prefers `xdg-terminal-exec`, then common
+   terminal emulators including Kitty, Foot, Alacritty, GNOME Terminal,
+   Console, Konsole, and xterm.
    Architecture-specific launchers remain under `launchers/`. No administrator
    rights are required.
 3. Choose **Audit** or **Developer**. Audit provides fixed,

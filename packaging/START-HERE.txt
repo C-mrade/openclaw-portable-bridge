@@ -9,6 +9,8 @@ Choose the launcher whose name matches this computer:
 
 The Linux file is a native Linux application. Its .exe suffix only works
 around FAT/VFAT removable-drive execute-bit limitations; it does not use Wine.
+When opened from a graphical file manager, it opens its own visible terminal
+so Audit/Developer consent and the activity stream remain interactive.
 
 If the launcher does not open when double-clicked, open a visible terminal in
 this folder and run:

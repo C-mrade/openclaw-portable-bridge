@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.2-beta.4
+
+- Fix graphical Linux launches by opening a visible terminal automatically,
+  preserving the interactive Audit/Developer consent choice and activity
+  stream instead of silently defaulting to Audit on stdin EOF.
+- Prefer the desktop-standard terminal launcher with tested fallbacks for
+  common Linux terminal emulators.
+
 ## 0.6.2-beta.3
 
 - Add clearly labelled root launchers for Windows, Linux, and macOS.
